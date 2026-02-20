@@ -47,10 +47,17 @@ class BackgroundWorker(
      * @return Whether the wallpaper change applied successfully without errors
      */
     private suspend fun runWallpaperChanger(config: WallpaperConfig): Boolean {
+        // For LOCAL source we need the selected file reference for the swap
+        var selectedLocalWallpaper: LocalWallpaperHelper.LocalWallpaper? = null
+
         val bitmap = when (config.source) {
             WallpaperSource.ONLINE -> getOnlineWallpaper(config)
             WallpaperSource.FAVORITES -> getFavoritesWallpaper()
-            WallpaperSource.LOCAL -> getLocalWallpaper(config)
+            WallpaperSource.LOCAL -> {
+                val result = pickLocalWallpaper(config) ?: return false
+                selectedLocalWallpaper = result.first
+                result.second
+            }
         } ?: return false
 
         if (config.applyImageFilters) {
@@ -65,6 +72,11 @@ class BackgroundWorker(
                 bitmap,
                 config.target
             )
+        }
+
+        // After successful wallpaper set, swap local file into wallpaper_used/
+        if (selectedLocalWallpaper != null) {
+            LocalWallpaperHelper.swapWallpaper(applicationContext, selectedLocalWallpaper)
         }
 
         return true
@@ -98,7 +110,9 @@ class BackgroundWorker(
         return ImageHelper.urlToBitmap(favoriteUrl, applicationContext, forceReload = true)
     }
 
-    private fun getLocalWallpaper(config: WallpaperConfig): Bitmap? {
+    private fun pickLocalWallpaper(
+        config: WallpaperConfig
+    ): Pair<LocalWallpaperHelper.LocalWallpaper, Bitmap>? {
         return try {
             val wallpapers = LocalWallpaperHelper.getLocalWalls(applicationContext, config)
             if (wallpapers.isEmpty()) return null
@@ -108,7 +122,10 @@ class BackgroundWorker(
             val randomGenerator = Random(System.currentTimeMillis())
             val randomIndex = randomGenerator.nextInt(wallpapers.size)
 
-            ImageHelper.getLocalImage(applicationContext, wallpapers[randomIndex].uri)
+            val selected = wallpapers[randomIndex]
+            val bitmap = ImageHelper.getLocalImage(applicationContext, selected.file.uri)
+                ?: return null
+            selected to bitmap
         } catch (e: Exception) {
             Log.e(this@BackgroundWorker::class.simpleName, e.toString())
             null
