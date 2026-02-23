@@ -11,7 +11,6 @@ import com.bnyro.wallpaper.enums.WallpaperSource
 import com.bnyro.wallpaper.obj.WallpaperConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.Random
 
 class BackgroundWorker(
     applicationContext: Context,
@@ -117,12 +116,14 @@ class BackgroundWorker(
             val wallpapers = LocalWallpaperHelper.getLocalWalls(applicationContext, config)
             if (wallpapers.isEmpty()) return null
 
-            // use Java's random number generator with a custom seed instead of Kotlin's
-            // see https://stackoverflow.com/questions/73475522/kotlin-random-always-generates-the-same-random-numbers
-            val randomGenerator = Random(System.currentTimeMillis())
-            val randomIndex = randomGenerator.nextInt(wallpapers.size)
+            val keyMap = wallpapers.associateBy { LocalWallpaperHelper.toStableKey(it) }
+            val pickedKey = ShuffleQueue.pickNext(
+                applicationContext,
+                "wallpaper_config_${config.id}",
+                keyMap.keys
+            ) ?: return null
 
-            val selected = wallpapers[randomIndex]
+            val selected = keyMap[pickedKey] ?: return null
             val bitmap = ImageHelper.getLocalImage(applicationContext, selected.file.uri)
                 ?: return null
             selected to bitmap

@@ -22,9 +22,9 @@ import com.bnyro.wallpaper.enums.WallpaperSource
 import com.bnyro.wallpaper.util.BackgroundWorker
 import com.bnyro.wallpaper.util.LocalWallpaperHelper
 import com.bnyro.wallpaper.util.Preferences
+import com.bnyro.wallpaper.util.ShuffleQueue
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.util.Random
 
 class WallpaperWidgetProvider : AppWidgetProvider() {
 
@@ -160,8 +160,7 @@ class WallpaperWidgetProvider : AppWidgetProvider() {
                     val lines = BufferedReader(InputStreamReader(stream)).readLines()
                         .filter { it.isNotBlank() }
                     if (lines.isEmpty()) return null
-                    val rng = Random(System.currentTimeMillis())
-                    lines[rng.nextInt(lines.size)]
+                    lines.random()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to read txt file", e)
@@ -177,8 +176,11 @@ class WallpaperWidgetProvider : AppWidgetProvider() {
                 return try {
                     val walls = LocalWallpaperHelper.getLocalWalls(context, localConfig)
                     if (walls.isEmpty()) return null
-                    val rng = Random(System.currentTimeMillis())
-                    val selected = walls[rng.nextInt(walls.size)]
+                    val keyMap = walls.associateBy { LocalWallpaperHelper.toStableKey(it) }
+                    val pickedKey = ShuffleQueue.pickNext(
+                        context, "widget_image", keyMap.keys
+                    ) ?: return null
+                    val selected = keyMap[pickedKey] ?: return null
                     loadAndScaleBitmap(context, selected.file.uri)
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to load local image for widget", e)

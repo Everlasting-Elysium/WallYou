@@ -55,6 +55,11 @@ object LocalWallpaperHelper {
 
     private val DocumentFile.isImage get() = type?.startsWith("image/") ?: false
 
+    fun toStableKey(wallpaper: LocalWallpaper): String {
+        val segments = wallpaper.relativeDirSegments + (wallpaper.file.name ?: "")
+        return segments.joinToString("/")
+    }
+
     fun getLocalWalls(context: Context, config: WallpaperConfig): List<LocalWallpaper> {
         return config.localFolderUris.mapNotNull { uriString ->
             val dir = DocumentFile.fromTreeUri(context, uriString.toUri())
