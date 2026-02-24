@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.bnyro.wallpaper.R
 import com.bnyro.wallpaper.enums.ThemeMode
+import com.bnyro.wallpaper.enums.WallpaperSource
 import com.bnyro.wallpaper.ext.formatBinarySize
 import com.bnyro.wallpaper.obj.WallpaperConfig
 import com.bnyro.wallpaper.ui.components.ButtonWithIcon
@@ -52,7 +53,9 @@ import com.bnyro.wallpaper.ui.components.prefs.ListPreference
 import com.bnyro.wallpaper.ui.components.prefs.SettingsCategory
 import com.bnyro.wallpaper.ui.models.MainModel
 import com.bnyro.wallpaper.util.BackupHelper
+import com.bnyro.wallpaper.util.LocalWallpaperHelper
 import com.bnyro.wallpaper.util.Preferences
+import com.bnyro.wallpaper.util.ShuffleQueue
 import com.bnyro.wallpaper.util.WorkerHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -161,7 +164,6 @@ fun SettingsPage(
 
                 WorkerHelper.enqueueOrCancelAll(context, wallpaperConfigs)
 
-                // request unrestricted battery usage if not yet granted
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && newValue) {
                     val pm = context.getSystemService(POWER_SERVICE) as PowerManager
 
@@ -215,6 +217,14 @@ fun SettingsPage(
                         WallpaperChangerPrefDialog(
                             wallpaperConfigs[index],
                             onConfigChange = { newConfig ->
+                                if (newConfig.source == WallpaperSource.LOCAL) {
+                                    ShuffleQueue.clear(context, "wallpaper_config_${newConfig.id}")
+                                    scope.launch(Dispatchers.IO) {
+                                        LocalWallpaperHelper.restoreAllUsedWallpapers(
+                                            context, newConfig.localFolderUris
+                                        )
+                                    }
+                                }
                                 wallpaperConfigs[index] = newConfig
                                 Preferences.setWallpaperConfigs(wallpaperConfigs)
                                 WorkerHelper.enqueue(context, newConfig, true)
@@ -249,6 +259,14 @@ fun SettingsPage(
                         WallpaperChangerPrefDialog(
                             config,
                             onConfigChange = { newConfig ->
+                                if (newConfig.source == WallpaperSource.LOCAL) {
+                                    ShuffleQueue.clear(context, "wallpaper_config_${newConfig.id}")
+                                    scope.launch(Dispatchers.IO) {
+                                        LocalWallpaperHelper.restoreAllUsedWallpapers(
+                                            context, newConfig.localFolderUris
+                                        )
+                                    }
+                                }
                                 wallpaperConfigs.add(newConfig)
                                 Preferences.setWallpaperConfigs(wallpaperConfigs)
                                 WorkerHelper.enqueue(context, newConfig, true)

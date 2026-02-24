@@ -72,6 +72,19 @@ object LocalWallpaperHelper {
             .filter { it.file.isImage }
     }
 
+    /**
+     * Restore all files from wallpaper_used/ back to their original
+     * locations for each folder URI. Called when a LOCAL source config
+     * is re-set so the queue can be rebuilt from a clean state.
+     */
+    fun restoreAllUsedWallpapers(context: Context, folderUris: List<String>) {
+        for (uriString in folderUris) {
+            val rootDir = DocumentFile.fromTreeUri(context, uriString.toUri()) ?: continue
+            val usedDir = rootDir.findFile(USED_DIR_NAME) ?: continue
+            restoreFromUsedDir(context, rootDir, usedDir)
+        }
+    }
+
     // ── Swap: move new wallpaper in, restore previous one out ────
 
     /**
