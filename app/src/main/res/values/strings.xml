@@ -125,4 +125,10 @@
     <string name="widget_confirm">Confirm</string>
     <string name="widget_no_txt_selected">Please select a text file first</string>
     <string name="widget_refresh_interval">Refresh interval: %d min</string>
+    <string name="widget_text_manage">Widget text</string>
+    <string name="widget_delete_current">Delete current</string>
+    <string name="widget_add_clipboard">Add from clipboard</string>
+    <string name="widget_no_current_text">No text currently displayed</string>
+    <string name="widget_no_text_widget">No text widget configured</string>
+    <string name="widget_clipboard_empty">Clipboard is empty</string>
 </resources>

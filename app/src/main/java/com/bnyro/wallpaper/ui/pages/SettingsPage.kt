@@ -1,11 +1,15 @@
 package com.bnyro.wallpaper.ui.pages
 
 import android.annotation.SuppressLint
+import android.appwidget.AppWidgetManager
+import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.Context.POWER_SERVICE
 import android.content.Intent
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,8 +30,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,8 +63,12 @@ import com.bnyro.wallpaper.util.LocalWallpaperHelper
 import com.bnyro.wallpaper.util.Preferences
 import com.bnyro.wallpaper.util.ShuffleQueue
 import com.bnyro.wallpaper.util.WorkerHelper
+import com.bnyro.wallpaper.widget.WallpaperWidgetProvider
+import com.bnyro.wallpaper.widget.WidgetPrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 @Composable
 fun SettingsPage(
@@ -274,6 +284,126 @@ fun SettingsPage(
                             onDismissRequest = { newWallpaperConfig = null }
                         )
                     }
+                }
+            }
+        }
+
+        AboutContainer {
+            Column {
+                SettingsCategory(
+                    title = stringResource(R.string.widget_text_manage)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                val widgetManager = remember { AppWidgetManager.getInstance(context) }
+                val textWidgetId = remember {
+                    val ids = widgetManager.getAppWidgetIds(
+                        ComponentName(context, WallpaperWidgetProvider::class.java)
+                    )
+                    ids.firstOrNull { WidgetPrefs.getMode(context, it) == WidgetPrefs.MODE_TEXT }
+                }
+
+                if (textWidgetId != null) {
+                    val txtUri = remember { WidgetPrefs.getTxtUri(context, textWidgetId) }
+                    var currentLine by remember { mutableStateOf<String?>(null) }
+                    val readCurrentLine = {
+                        currentLine = WidgetPrefs.getCurrentLine(context, textWidgetId)
+                    }
+                    SideEffect { readCurrentLine() }
+
+                    if (currentLine != null) {
+                        Text(
+                            text = currentLine!!,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.widget_no_current_text),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row {
+                        Button(
+                            onClick = {
+                                if (txtUri == null || currentLine == null) return@Button
+                                scope.launch(Dispatchers.IO) {
+                                    try {
+                                        val uri = txtUri.toUri()
+                                        val lines = context.contentResolver.openInputStream(uri)?.use { stream ->
+                                            BufferedReader(InputStreamReader(stream)).readLines()
+                                        } ?: return@launch
+
+                                        val lineToDelete = currentLine ?: return@launch
+                                        val newLines = lines.toMutableList()
+                                        newLines.remove(lineToDelete)
+
+                                        context.contentResolver.openOutputStream(uri, "w")?.use { stream ->
+                                            stream.write(newLines.joinToString("\n").toByteArray())
+                                        }
+
+                                        WallpaperWidgetProvider.updateWidget(context, widgetManager, textWidgetId)
+                                        readCurrentLine()
+                                    } catch (_: Exception) {}
+                                }
+                            },
+                            enabled = currentLine != null
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(imageVector = Icons.Default.Delete, contentDescription = null)
+                                Spacer(Modifier.width(5.dp))
+                                Text(stringResource(R.string.widget_delete_current))
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        Button(
+                            onClick = {
+                                if (txtUri == null) return@Button
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
+                                if (clipText.isNullOrBlank()) {
+                                    Toast.makeText(context, R.string.widget_clipboard_empty, Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                scope.launch(Dispatchers.IO) {
+                                    try {
+                                        val uri = txtUri.toUri()
+                                        val existing = context.contentResolver.openInputStream(uri)?.use { stream ->
+                                            stream.bufferedReader().readText()
+                                        } ?: ""
+
+                                        val trimmed = clipText.trim()
+                                        val newContent = if (existing.endsWith("\n") || existing.isEmpty()) {
+                                            existing + trimmed + "\n"
+                                        } else {
+                                            existing + "\n" + trimmed + "\n"
+                                        }
+
+                                        context.contentResolver.openOutputStream(uri, "w")?.use { stream ->
+                                            stream.write(newContent.toByteArray())
+                                        }
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(imageVector = Icons.Default.Add, contentDescription = null)
+                                Spacer(Modifier.width(5.dp))
+                                Text(stringResource(R.string.widget_add_clipboard))
+                            }
+                        }
+                    }
+                } else {
+                    Text(
+                        text = stringResource(R.string.widget_no_text_widget),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                    )
                 }
             }
         }

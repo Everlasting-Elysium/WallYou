@@ -105,6 +105,7 @@ class WallpaperWidgetProvider : AppWidgetProvider() {
                     views.setViewVisibility(R.id.widget_image, View.GONE)
                     views.setViewVisibility(R.id.widget_text, View.VISIBLE)
                     val line = readRandomLine(context, widgetId)
+                    WidgetPrefs.setCurrentLine(context, widgetId, line)
                     views.setTextViewText(R.id.widget_text, line ?: "")
                 }
                 WidgetPrefs.MODE_IMAGE -> {
