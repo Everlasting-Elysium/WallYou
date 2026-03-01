@@ -82,8 +82,8 @@ class ImageCompressWorker(
         }
 
         try {
-            // Move original to .wallpaper_originals/
-            backupOriginal(context, wallpaper)
+            // Move original to wallpaper_originals/
+            if (!backupOriginal(context, wallpaper)) return
 
             // Write compressed image to original location
             val fileName = file.name ?: return
@@ -104,19 +104,20 @@ class ImageCompressWorker(
     }
 
     /**
-     * Move the original file into .wallpaper_originals/ under the same root,
+     * Move the original file into wallpaper_originals/ under the same root,
      * preserving the relative subdirectory structure.
+     * Returns true if backup succeeded and original was deleted.
      */
     private fun backupOriginal(
         context: Context,
         wallpaper: LocalWallpaperHelper.LocalWallpaper,
-    ) {
+    ): Boolean {
         val rootDir = wallpaper.rootDir
         val originalsDir = rootDir.findFile(LocalWallpaperHelper.ORIGINALS_DIR_NAME)
             ?: rootDir.createDirectory(LocalWallpaperHelper.ORIGINALS_DIR_NAME)
             ?: run {
                 Log.e(TAG, "Failed to create ${LocalWallpaperHelper.ORIGINALS_DIR_NAME}")
-                return
+                return false
             }
 
         var destDir = originalsDir
@@ -125,27 +126,29 @@ class ImageCompressWorker(
                 ?: destDir.createDirectory(segment)
                 ?: run {
                     Log.e(TAG, "Failed to create subdirectory: $segment")
-                    return
+                    return false
                 }
         }
 
-        val fileName = wallpaper.file.name ?: return
+        val fileName = wallpaper.file.name ?: return false
         val mimeType = wallpaper.file.type ?: "application/octet-stream"
         val backupFile = destDir.createFile(mimeType, fileName) ?: run {
             Log.e(TAG, "Failed to create backup file: $fileName")
-            return
+            return false
         }
 
-        try {
+        return try {
             context.contentResolver.openInputStream(wallpaper.file.uri)?.use { input ->
                 context.contentResolver.openOutputStream(backupFile.uri)?.use { output ->
                     input.copyTo(output)
                 }
             }
             wallpaper.file.delete()
+            true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to backup original: $fileName", e)
             runCatching { backupFile.delete() }
+            false
         }
     }
 

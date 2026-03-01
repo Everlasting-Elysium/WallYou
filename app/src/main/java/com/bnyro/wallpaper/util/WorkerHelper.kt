@@ -75,7 +75,6 @@ object WorkerHelper {
     fun enqueueCompressWorker(context: Context) {
         val constraints = Constraints.Builder()
             .setRequiresCharging(true)
-            .setRequiresDeviceIdle(true)
             .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
             .build()
 
