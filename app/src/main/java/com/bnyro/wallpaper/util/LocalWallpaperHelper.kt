@@ -10,7 +10,7 @@ object LocalWallpaperHelper {
     private const val USED_DIR_NAME = "wallpaper_used"
 
     /** Directory used by ImageCompressWorker to hold original (pre-compression) files. */
-    const val ORIGINALS_DIR_NAME = ".wallpaper_originals"
+    const val ORIGINALS_DIR_NAME = "wallpaper_originals"
 
     /** Directory used by DeleteWallpaperTileService as a recycle bin. */
     const val TRASH_DIR_NAME = "wallpaper_trash"
@@ -34,8 +34,8 @@ object LocalWallpaperHelper {
 
     /**
      * Recursively collect files under [directory], tracking the relative
-     * subdirectory path from root. Skips hidden dirs (including .wallpaper_originals)
-     * and the legacy [USED_DIR_NAME].
+     * subdirectory path from root. Skips hidden dirs, reserved dirs
+     * (wallpaper_originals, wallpaper_trash) and the legacy [USED_DIR_NAME].
      */
     private fun collectFiles(
         directory: DocumentFile?,
@@ -49,7 +49,7 @@ object LocalWallpaperHelper {
         contents.filter {
             it.isDirectory &&
                     !it.name.orEmpty().startsWith(".") &&
-                    it.name != USED_DIR_NAME && it.name != TRASH_DIR_NAME
+                    it.name != USED_DIR_NAME && it.name != TRASH_DIR_NAME && it.name != ORIGINALS_DIR_NAME
         }.forEach { subDir ->
             results.addAll(
                 collectFiles(subDir, relativeDirSegments + subDir.name.orEmpty())
