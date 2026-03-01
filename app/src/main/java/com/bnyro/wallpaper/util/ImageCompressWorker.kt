@@ -29,6 +29,9 @@ class ImageCompressWorker(
                 }
             }
 
+            // Clean up old originals (> 7 days)
+            cleanupOldOriginals(configs)
+
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Compress worker failed", e)
@@ -85,11 +88,12 @@ class ImageCompressWorker(
             // Move original to wallpaper_originals/
             if (!backupOriginal(context, wallpaper)) return
 
-            // Write compressed image to original location
-            val fileName = file.name ?: return
+            // Ensure .jpg extension since we always compress to JPEG
+            val rawName = file.name ?: return
+            val jpgName = rawName.substringBeforeLast('.') + ".jpg"
             val parentDir = getParentDir(context, wallpaper) ?: return
-            val newFile = parentDir.createFile("image/jpeg", fileName) ?: run {
-                Log.e(TAG, "Failed to create compressed file: $fileName")
+            val newFile = parentDir.createFile("image/jpeg", jpgName) ?: run {
+                Log.e(TAG, "Failed to create compressed file: $jpgName")
                 return
             }
 
@@ -168,9 +172,42 @@ class ImageCompressWorker(
         return dir
     }
 
+    /**
+     * Delete files in wallpaper_originals/ that are older than [ORIGINALS_RETAIN_DAYS] days.
+     */
+    private fun cleanupOldOriginals(configs: List<com.bnyro.wallpaper.obj.WallpaperConfig>) {
+        val cutoff = System.currentTimeMillis() - ORIGINALS_RETAIN_DAYS * 24 * 60 * 60 * 1000L
+        for (config in configs) {
+            for (uriString in config.localFolderUris) {
+                try {
+                    val rootDir = DocumentFile.fromTreeUri(applicationContext, uriString.toUri())
+                        ?: continue
+                    val originalsDir = rootDir.findFile(LocalWallpaperHelper.ORIGINALS_DIR_NAME)
+                        ?: continue
+                    deleteOlderThan(originalsDir, cutoff)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Cleanup failed for $uriString", e)
+                }
+            }
+        }
+    }
+
+    private fun deleteOlderThan(dir: DocumentFile, cutoff: Long) {
+        for (child in dir.listFiles()) {
+            if (child.isDirectory) {
+                deleteOlderThan(child, cutoff)
+                // Remove empty directories
+                if (child.listFiles().isEmpty()) child.delete()
+            } else if (child.lastModified() < cutoff) {
+                child.delete()
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "ImageCompressWorker"
         const val MAX_LONG_SIDE = 4800
         private const val JPEG_QUALITY = 85
+        private const val ORIGINALS_RETAIN_DAYS = 7
     }
 }
