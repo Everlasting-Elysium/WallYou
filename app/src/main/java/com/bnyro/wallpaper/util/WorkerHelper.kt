@@ -85,6 +85,6 @@ object WorkerHelper {
             .build()
 
         WorkManager.getInstance(context)
-            .enqueueUniquePeriodicWork(COMPRESS_JOB_NAME, ExistingPeriodicWorkPolicy.KEEP, job)
+            .enqueueUniquePeriodicWork(COMPRESS_JOB_NAME, ExistingPeriodicWorkPolicy.UPDATE, job)
     }
 }
