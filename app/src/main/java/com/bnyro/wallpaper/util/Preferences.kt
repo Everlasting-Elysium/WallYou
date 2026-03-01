@@ -21,6 +21,10 @@ object Preferences {
     const val brightnessKey = "brightness"
     const val autoLightenDarkenKey = "autoLightenDarken"
 
+    private const val currentWallpaperKeyPref = "current_wallpaper_key"
+    private const val currentWallpaperUriPref = "current_wallpaper_uri"
+    private const val currentWallpaperFolderUriPref = "current_wallpaper_folder_uri"
+
     const val wallpaperChangerKey = "wallpaperChanger"
     private const val wallpaperChangerConfigKey = "wallpaperChangerConfigurations"
 
@@ -61,4 +65,16 @@ object Preferences {
             listOf()
         }
     }
+
+    fun setCurrentWallpaper(key: String?, uri: String?, folderUri: String?) {
+        edit {
+            putString(currentWallpaperKeyPref, key)
+            putString(currentWallpaperUriPref, uri)
+            putString(currentWallpaperFolderUriPref, folderUri)
+        }
+    }
+
+    fun getCurrentWallpaperKey(): String? = preferences.getString(currentWallpaperKeyPref, null)
+    fun getCurrentWallpaperUri(): String? = preferences.getString(currentWallpaperUriPref, null)
+    fun getCurrentWallpaperFolderUri(): String? = preferences.getString(currentWallpaperFolderUriPref, null)
 }

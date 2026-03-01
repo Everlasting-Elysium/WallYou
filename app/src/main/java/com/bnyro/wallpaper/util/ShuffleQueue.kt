@@ -42,7 +42,7 @@ object ShuffleQueue {
         used.add(pick)
 
         saveList(context, remainingKey(queueName), removedFromRemaining)
-        saveList(context, usedKey(queueName), used.filter { it in currentKeys })
+        saveList(context, usedKey(queueName), used)
 
         return pick
     }
@@ -52,5 +52,14 @@ object ShuffleQueue {
             .remove(remainingKey(queueName))
             .remove(usedKey(queueName))
             .apply()
+    }
+
+    fun removeKey(context: Context, queueName: String, key: String) {
+        val remaining = loadList(context, remainingKey(queueName))
+        val used = loadList(context, usedKey(queueName))
+        remaining.remove(key)
+        used.remove(key)
+        saveList(context, remainingKey(queueName), remaining)
+        saveList(context, usedKey(queueName), used)
     }
 }

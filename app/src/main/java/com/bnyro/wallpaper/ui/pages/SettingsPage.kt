@@ -59,7 +59,6 @@ import com.bnyro.wallpaper.ui.components.prefs.ListPreference
 import com.bnyro.wallpaper.ui.components.prefs.SettingsCategory
 import com.bnyro.wallpaper.ui.models.MainModel
 import com.bnyro.wallpaper.util.BackupHelper
-import com.bnyro.wallpaper.util.LocalWallpaperHelper
 import com.bnyro.wallpaper.util.Preferences
 import com.bnyro.wallpaper.util.ShuffleQueue
 import com.bnyro.wallpaper.util.WorkerHelper
@@ -229,11 +228,6 @@ fun SettingsPage(
                             onConfigChange = { newConfig ->
                                 if (newConfig.source == WallpaperSource.LOCAL) {
                                     ShuffleQueue.clear(context, "wallpaper_config_${newConfig.id}")
-                                    scope.launch(Dispatchers.IO) {
-                                        LocalWallpaperHelper.restoreAllUsedWallpapers(
-                                            context, newConfig.localFolderUris
-                                        )
-                                    }
                                 }
                                 wallpaperConfigs[index] = newConfig
                                 Preferences.setWallpaperConfigs(wallpaperConfigs)
@@ -271,11 +265,6 @@ fun SettingsPage(
                             onConfigChange = { newConfig ->
                                 if (newConfig.source == WallpaperSource.LOCAL) {
                                     ShuffleQueue.clear(context, "wallpaper_config_${newConfig.id}")
-                                    scope.launch(Dispatchers.IO) {
-                                        LocalWallpaperHelper.restoreAllUsedWallpapers(
-                                            context, newConfig.localFolderUris
-                                        )
-                                    }
                                 }
                                 wallpaperConfigs.add(newConfig)
                                 Preferences.setWallpaperConfigs(wallpaperConfigs)

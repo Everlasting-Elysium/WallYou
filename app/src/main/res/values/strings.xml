@@ -131,4 +131,8 @@
     <string name="widget_no_current_text">No text currently displayed</string>
     <string name="widget_no_text_widget">No text widget configured</string>
     <string name="widget_clipboard_empty">Clipboard is empty</string>
+    <!-- Quick Settings Tiles -->
+    <string name="delete_current_wallpaper">Delete wallpaper</string>
+    <string name="delete_current_text">Delete text</string>
+    <string name="open_current_wallpaper">Open wallpaper</string>
 </resources>

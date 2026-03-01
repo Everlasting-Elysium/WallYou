@@ -46,17 +46,10 @@ class BackgroundWorker(
      * @return Whether the wallpaper change applied successfully without errors
      */
     private suspend fun runWallpaperChanger(config: WallpaperConfig): Boolean {
-        // For LOCAL source we need the selected file reference for the swap
-        var selectedLocalWallpaper: LocalWallpaperHelper.LocalWallpaper? = null
-
         val bitmap = when (config.source) {
             WallpaperSource.ONLINE -> getOnlineWallpaper(config)
             WallpaperSource.FAVORITES -> getFavoritesWallpaper()
-            WallpaperSource.LOCAL -> {
-                val result = pickLocalWallpaper(config) ?: return false
-                selectedLocalWallpaper = result.first
-                result.second
-            }
+            WallpaperSource.LOCAL -> pickLocalWallpaper(config)
         } ?: return false
 
         if (config.applyImageFilters) {
@@ -71,11 +64,6 @@ class BackgroundWorker(
                 bitmap,
                 config.target
             )
-        }
-
-        // After successful wallpaper set, swap local file into wallpaper_used/
-        if (selectedLocalWallpaper != null) {
-            LocalWallpaperHelper.swapWallpaper(applicationContext, selectedLocalWallpaper)
         }
 
         return true
@@ -109,9 +97,7 @@ class BackgroundWorker(
         return ImageHelper.urlToBitmap(favoriteUrl, applicationContext, forceReload = true)
     }
 
-    private fun pickLocalWallpaper(
-        config: WallpaperConfig
-    ): Pair<LocalWallpaperHelper.LocalWallpaper, Bitmap>? {
+    private fun pickLocalWallpaper(config: WallpaperConfig): Bitmap? {
         return try {
             val wallpapers = LocalWallpaperHelper.getLocalWalls(applicationContext, config)
             if (wallpapers.isEmpty()) return null
@@ -124,12 +110,18 @@ class BackgroundWorker(
             ) ?: return null
 
             val selected = keyMap[pickedKey] ?: return null
-            val bitmap = ImageHelper.getLocalImage(applicationContext, selected.file.uri)
-                ?: return null
-            selected to bitmap
+
+            // Record current wallpaper metadata for tile actions
+            Preferences.setCurrentWallpaper(
+                key = pickedKey,
+                uri = selected.file.uri.toString(),
+                folderUri = selected.rootDir.uri.toString()
+            )
+
+            ImageHelper.getLocalImage(applicationContext, selected.file.uri)
         } catch (e: Exception) {
             Log.e(this@BackgroundWorker::class.simpleName, e.toString())
             null
         }
-    }
+}
 }

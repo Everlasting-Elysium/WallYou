@@ -55,6 +55,38 @@
             </intent-filter>
         </service>
 
+        <service
+            android:name=".util.DeleteWallpaperTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_delete_wallpaper"
+            android:label="@string/delete_current_wallpaper"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".util.DeleteTextTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_delete_text"
+            android:label="@string/delete_current_text"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".util.OpenWallpaperTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_open_wallpaper"
+            android:label="@string/open_current_wallpaper"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
         <receiver
             android:name=".widget.WallpaperWidgetProvider"
             android:exported="true"
