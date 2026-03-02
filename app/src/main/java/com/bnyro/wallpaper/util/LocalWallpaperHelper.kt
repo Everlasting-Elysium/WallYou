@@ -139,10 +139,21 @@ object LocalWallpaperHelper {
         val oldKey = toStableKey(wallpaper)
         val ext = rawName.substringAfterLast('.', "")
         val newFileName = if (ext.isNotEmpty()) "${timestamp}.${ext}" else "$timestamp"
+        val newKey = (wallpaper.relativeDirSegments + newFileName).joinToString("/")
+
+        // Fast path: renameTo only touches metadata, no data copy
+        if (wallpaper.file.renameTo(newFileName)) {
+            val parentDir = getParentDir(wallpaper)
+            val renamed = parentDir?.findFile(newFileName)
+            if (renamed != null) {
+                Log.d(TAG, "Renamed $rawName -> $newFileName (renameTo)")
+                return ProcessResult(renamed.uri, newKey)
+            }
+        }
+
+        // Fallback: copy + delete (some SAF providers don't support renameTo)
         val mimeType = wallpaper.file.type ?: "application/octet-stream"
         val parentDir = getParentDir(wallpaper) ?: return ProcessResult(wallpaper.file.uri, oldKey)
-
-        // Delete any leftover with same name to avoid SAF duplicates
         parentDir.findFile(newFileName)?.delete()
 
         val newFile = parentDir.createFile(mimeType, newFileName.substringBeforeLast('.')) ?: run {
@@ -157,9 +168,7 @@ object LocalWallpaperHelper {
                 }
             }
             wallpaper.file.delete()
-
-            val newKey = (wallpaper.relativeDirSegments + newFileName).joinToString("/")
-            Log.d(TAG, "Renamed $rawName -> $newFileName")
+            Log.d(TAG, "Renamed $rawName -> $newFileName (copy+delete fallback)")
             ProcessResult(newFile.uri, newKey)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to rename $rawName -> $newFileName", e)
