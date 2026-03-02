@@ -123,7 +123,7 @@ object LocalWallpaperHelper {
         return if (needsCompress) {
             compressAndRename(context, wallpaper, rawName, timestamp, origWidth, origHeight, longSide)
         } else {
-            renameOnly(wallpaper, rawName, timestamp)
+            renameOnly(context, wallpaper, rawName, timestamp)
         }
     }
 
@@ -131,6 +131,7 @@ object LocalWallpaperHelper {
      * Rename the file to {timestamp}.{ext} without compressing.
      */
     private fun renameOnly(
+        context: Context,
         wallpaper: LocalWallpaper,
         rawName: String,
         timestamp: Long,
@@ -138,22 +139,33 @@ object LocalWallpaperHelper {
         val oldKey = toStableKey(wallpaper)
         val ext = rawName.substringAfterLast('.', "")
         val newFileName = if (ext.isNotEmpty()) "${timestamp}.${ext}" else "$timestamp"
+        val mimeType = wallpaper.file.type ?: "application/octet-stream"
+        val parentDir = getParentDir(wallpaper) ?: return ProcessResult(wallpaper.file.uri, oldKey)
 
-        if (!wallpaper.file.renameTo(newFileName)) {
-            Log.w(TAG, "Failed to rename ${rawName} -> $newFileName")
+        // Delete any leftover with same name to avoid SAF duplicates
+        parentDir.findFile(newFileName)?.delete()
+
+        val newFile = parentDir.createFile(mimeType, newFileName.substringBeforeLast('.')) ?: run {
+            Log.w(TAG, "Failed to create renamed file: $newFileName")
             return ProcessResult(wallpaper.file.uri, oldKey)
         }
 
-        // After renameTo the DocumentFile's internal URI may be stale; re-resolve
-        val parentDir = getParentDir(wallpaper)
-        val renamed = parentDir?.findFile(newFileName)
-        if (renamed != null) {
+        return try {
+            context.contentResolver.openInputStream(wallpaper.file.uri)?.use { input ->
+                context.contentResolver.openOutputStream(newFile.uri)?.use { output ->
+                    input.copyTo(output)
+                }
+            }
+            wallpaper.file.delete()
+
             val newKey = (wallpaper.relativeDirSegments + newFileName).joinToString("/")
             Log.d(TAG, "Renamed $rawName -> $newFileName")
-            return ProcessResult(renamed.uri, newKey)
+            ProcessResult(newFile.uri, newKey)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to rename $rawName -> $newFileName", e)
+            runCatching { newFile.delete() }
+            ProcessResult(wallpaper.file.uri, oldKey)
         }
-
-        return ProcessResult(wallpaper.file.uri, oldKey)
     }
 
     /**
