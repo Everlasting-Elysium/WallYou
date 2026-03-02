@@ -85,12 +85,12 @@ class ImageCompressWorker(
         }
 
         try {
-            // Move original to wallpaper_originals/
-            if (!backupOriginal(context, wallpaper)) return
-
-            // Ensure .jpg extension since we always compress to JPEG
+            // Capture file name BEFORE backup deletes the original
             val rawName = file.name ?: return
             val jpgName = rawName.substringBeforeLast('.') + ".jpg"
+
+            // Move original to wallpaper_originals/
+            if (!backupOriginal(context, wallpaper)) return
             val parentDir = getParentDir(context, wallpaper) ?: return
             val newFile = parentDir.createFile("image/jpeg", jpgName) ?: run {
                 Log.e(TAG, "Failed to create compressed file: $jpgName")
