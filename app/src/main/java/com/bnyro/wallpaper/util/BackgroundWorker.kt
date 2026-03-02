@@ -24,6 +24,7 @@ class BackgroundWorker(
             for (config in wallpaperConfigs) {
                 runWallpaperChanger(config)
             }
+            LocalWallpaperHelper.cleanupOldOriginals(applicationContext)
             return Result.success()
         }
 
@@ -36,8 +37,10 @@ class BackgroundWorker(
             !TimeHelper.isInTimeRange(nowMillis, config.startTimeMillis!!, config.endTimeMillis!!)
         ) return Result.success()
 
-        return if (runWallpaperChanger(config)) Result.success()
+        val changerResult = if (runWallpaperChanger(config)) Result.success()
         else Result.retry()
+        LocalWallpaperHelper.cleanupOldOriginals(applicationContext)
+        return changerResult
     }
 
     /**
@@ -103,25 +106,34 @@ class BackgroundWorker(
             if (wallpapers.isEmpty()) return null
 
             val keyMap = wallpapers.associateBy { LocalWallpaperHelper.toStableKey(it) }
+            val queueName = "wallpaper_config_${config.id}"
             val pickedKey = ShuffleQueue.pickNext(
                 applicationContext,
-                "wallpaper_config_${config.id}",
+                queueName,
                 keyMap.keys
             ) ?: return null
 
             val selected = keyMap[pickedKey] ?: return null
 
+            // Rename + compress if needed (backs up original, returns final URI and new key)
+            val result = LocalWallpaperHelper.processWallpaper(applicationContext, selected)
+
+            // Sync ShuffleQueue if key changed (file was renamed)
+            if (result.newKey != pickedKey) {
+                ShuffleQueue.replaceKey(applicationContext, queueName, pickedKey, result.newKey)
+            }
+
             // Record current wallpaper metadata for tile actions
             Preferences.setCurrentWallpaper(
-                key = pickedKey,
-                uri = selected.file.uri.toString(),
+                key = result.newKey,
+                uri = result.uri.toString(),
                 folderUri = selected.rootDir.uri.toString()
             )
 
-            ImageHelper.getLocalImage(applicationContext, selected.file.uri)
+            ImageHelper.getLocalImage(applicationContext, result.uri)
         } catch (e: Exception) {
             Log.e(this@BackgroundWorker::class.simpleName, e.toString())
             null
         }
-}
+    }
 }

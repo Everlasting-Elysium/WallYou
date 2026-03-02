@@ -62,4 +62,15 @@ object ShuffleQueue {
         saveList(context, remainingKey(queueName), remaining)
         saveList(context, usedKey(queueName), used)
     }
+
+    fun replaceKey(context: Context, queueName: String, oldKey: String, newKey: String) {
+        val remaining = loadList(context, remainingKey(queueName))
+        val used = loadList(context, usedKey(queueName))
+        val remIdx = remaining.indexOf(oldKey)
+        if (remIdx >= 0) remaining[remIdx] = newKey
+        val usedIdx = used.indexOf(oldKey)
+        if (usedIdx >= 0) used[usedIdx] = newKey
+        saveList(context, remainingKey(queueName), remaining)
+        saveList(context, usedKey(queueName), used)
+    }
 }

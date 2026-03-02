@@ -23,7 +23,6 @@ import coil.disk.DiskCache
 import com.bnyro.wallpaper.db.DatabaseHolder
 import com.bnyro.wallpaper.util.WallpaperApiWrapper
 import com.bnyro.wallpaper.util.Preferences
-import com.bnyro.wallpaper.util.WorkerHelper
 import net.youapps.wallpaper_apis.RetrofitHelper
 import net.youapps.wallpaper_apis.bi.BingApi
 import net.youapps.wallpaper_apis.le.LemmyApi
@@ -47,7 +46,6 @@ class App : Application(), ImageLoaderFactory {
 
         DatabaseHolder.create(this)
 
-        WorkerHelper.enqueueCompressWorker(this)
     }
 
     override fun newImageLoader(): ImageLoader {

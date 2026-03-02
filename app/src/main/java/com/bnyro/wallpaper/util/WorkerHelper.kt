@@ -14,7 +14,6 @@ import java.util.concurrent.TimeUnit
 object WorkerHelper {
     private const val JOB_NAME_PREFIX = "WallpaperChanger"
     const val WALLPAPER_CONFIG_ID = "WallpaperConfigId"
-    private const val COMPRESS_JOB_NAME = "ImageCompressor"
 
     private fun getWorkerConstraints(config: WallpaperConfig): Constraints {
         // only require internet when the source is not local
@@ -72,19 +71,4 @@ object WorkerHelper {
         }
     }
 
-    fun enqueueCompressWorker(context: Context) {
-        val constraints = Constraints.Builder()
-            .setRequiresCharging(true)
-            .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
-            .build()
-
-        val job = PeriodicWorkRequestBuilder<ImageCompressWorker>(
-            1, TimeUnit.DAYS
-        )
-            .setConstraints(constraints)
-            .build()
-
-        WorkManager.getInstance(context)
-            .enqueueUniquePeriodicWork(COMPRESS_JOB_NAME, ExistingPeriodicWorkPolicy.UPDATE, job)
-    }
 }

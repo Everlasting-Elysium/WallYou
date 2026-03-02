@@ -420,29 +420,5 @@ fun SettingsPage(
                 }
             }
         }
-
-        AboutContainer {
-            Column {
-                SettingsCategory(
-                    title = "Image Compression"
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                var compressing by remember { mutableStateOf(false) }
-                Button(
-                    onClick = {
-                        compressing = true
-                        scope.launch(Dispatchers.IO) {
-                            val request = androidx.work.OneTimeWorkRequestBuilder<com.bnyro.wallpaper.util.ImageCompressWorker>().build()
-                            androidx.work.WorkManager.getInstance(context)
-                                .enqueue(request)
-                            compressing = false
-                        }
-                    },
-                    enabled = !compressing
-                ) {
-                    Text(if (compressing) "Compressing..." else "Compress images now")
-                }
-            }
-        }
     }
 }
