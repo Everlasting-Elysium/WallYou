@@ -86,7 +86,7 @@ object LocalWallpaperHelper {
     // ── On-demand rename + compression ──────────────────────────────
 
     private const val TAG = "LocalWallpaperHelper"
-    const val MAX_LONG_SIDE = 4800
+    const val MAX_HEIGHT = 4800
     private const val JPEG_QUALITY = 85
     private const val ORIGINALS_RETAIN_DAYS = 7
     private const val COMPRESSED_SUFFIX = "_compressed"
@@ -125,10 +125,10 @@ object LocalWallpaperHelper {
         val origWidth = opts.outWidth
         val origHeight = opts.outHeight
         val longSide = if (origWidth > 0 && origHeight > 0) maxOf(origWidth, origHeight) else 0
-        val needsCompress = longSide > MAX_LONG_SIDE
+        val needsCompress = origHeight > 0 && origHeight > MAX_HEIGHT
 
         return if (needsCompress) {
-            compressAndRename(context, wallpaper, rawName, timestamp, origWidth, origHeight, longSide)
+            compressAndRename(context, wallpaper, rawName, timestamp, origWidth, origHeight)
         } else {
             renameOnly(context, wallpaper, rawName, timestamp)
         }
@@ -194,7 +194,6 @@ object LocalWallpaperHelper {
         timestamp: Long,
         origWidth: Int,
         origHeight: Int,
-        longSide: Int,
     ): ProcessResult {
         val oldKey = toStableKey(wallpaper)
         val file = wallpaper.file
@@ -203,10 +202,10 @@ object LocalWallpaperHelper {
 
         // Calculate inSampleSize (power of 2) for memory-efficient decoding
         var inSampleSize = 1
-        var halfLong = longSide / 2
-        while (halfLong / inSampleSize >= MAX_LONG_SIDE) {
+        var halfHeight = origHeight / 2
+        while (halfHeight / inSampleSize >= MAX_HEIGHT) {
             inSampleSize *= 2
-            halfLong = longSide / (inSampleSize * 2)
+            halfHeight = origHeight / (inSampleSize * 2)
         }
 
         val decodeOpts = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
@@ -215,7 +214,7 @@ object LocalWallpaperHelper {
         } ?: return ProcessResult(file.uri, oldKey)
 
         // Scale to exact target dimensions
-        val scale = MAX_LONG_SIDE.toFloat() / maxOf(sampledBitmap.width, sampledBitmap.height)
+        val scale = MAX_HEIGHT.toFloat() / sampledBitmap.height
         val targetWidth = (sampledBitmap.width * scale).toInt()
         val targetHeight = (sampledBitmap.height * scale).toInt()
 
