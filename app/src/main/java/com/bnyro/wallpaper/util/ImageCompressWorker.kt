@@ -87,13 +87,20 @@ class ImageCompressWorker(
         try {
             // Capture file name BEFORE backup deletes the original
             val rawName = file.name ?: return
-            val jpgName = rawName.substringBeforeLast('.') + ".jpg"
 
             // Move original to wallpaper_originals/
             if (!backupOriginal(context, wallpaper)) return
+            // Strip extension — SAF auto-appends from mime type
+            val displayName = rawName.substringBeforeLast('.')
             val parentDir = getParentDir(context, wallpaper) ?: return
-            val newFile = parentDir.createFile("image/jpeg", jpgName) ?: run {
-                Log.e(TAG, "Failed to create compressed file: $jpgName")
+
+            // Delete any leftover with same name to avoid duplicates
+            parentDir.findFile(rawName)?.delete()  // original name (e.g. photo.png)
+            val jpgName = displayName + ".jpg"
+            parentDir.findFile(jpgName)?.delete()   // target name (e.g. photo.jpg)
+
+            val newFile = parentDir.createFile("image/jpeg", displayName) ?: run {
+                Log.e(TAG, "Failed to create compressed file: $displayName")
                 return
             }
 
@@ -136,6 +143,10 @@ class ImageCompressWorker(
 
         val fileName = wallpaper.file.name ?: return false
         val mimeType = wallpaper.file.type ?: "application/octet-stream"
+
+        // Delete existing backup to avoid SAF creating "photo (1).png"
+        destDir.findFile(fileName)?.delete()
+
         val backupFile = destDir.createFile(mimeType, fileName) ?: run {
             Log.e(TAG, "Failed to create backup file: $fileName")
             return false
