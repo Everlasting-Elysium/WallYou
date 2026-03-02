@@ -90,6 +90,7 @@ object LocalWallpaperHelper {
     private const val JPEG_QUALITY = 85
     private const val ORIGINALS_RETAIN_DAYS = 7
     private const val COMPRESSED_SUFFIX = "_compressed"
+    private const val RENAME_PREFIX = "wy_"
 
     data class ProcessResult(
         val uri: Uri,
@@ -107,6 +108,12 @@ object LocalWallpaperHelper {
         val file = wallpaper.file
         val oldKey = toStableKey(wallpaper)
         val rawName = file.name ?: return ProcessResult(file.uri, oldKey)
+
+        // Already processed (has our prefix) — skip rename/compress
+        if (rawName.startsWith(RENAME_PREFIX)) {
+            return ProcessResult(file.uri, oldKey)
+        }
+
         val timestamp = System.currentTimeMillis()
 
         // Read dimensions to decide whether compression is needed
@@ -138,7 +145,7 @@ object LocalWallpaperHelper {
     ): ProcessResult {
         val oldKey = toStableKey(wallpaper)
         val ext = rawName.substringAfterLast('.', "")
-        val newFileName = if (ext.isNotEmpty()) "${timestamp}.${ext}" else "$timestamp"
+        val newFileName = if (ext.isNotEmpty()) "${RENAME_PREFIX}${timestamp}.${ext}" else "${RENAME_PREFIX}$timestamp"
         val newKey = (wallpaper.relativeDirSegments + newFileName).joinToString("/")
 
         // Fast path: renameTo only touches metadata, no data copy
@@ -224,7 +231,7 @@ object LocalWallpaperHelper {
             // Backup original to wallpaper_originals/
             if (!backupOriginal(context, wallpaper)) return ProcessResult(file.uri, oldKey)
 
-            val displayName = "${timestamp}${COMPRESSED_SUFFIX}"
+            val displayName = "${RENAME_PREFIX}${timestamp}${COMPRESSED_SUFFIX}"
             val parentDir = getParentDir(wallpaper) ?: return ProcessResult(file.uri, oldKey)
 
             // Delete any leftover with same name to avoid SAF duplicates
