@@ -90,7 +90,7 @@ object LocalWallpaperHelper {
     private const val JPEG_QUALITY = 85
     private const val ORIGINALS_RETAIN_DAYS = 7
     private const val COMPRESSED_SUFFIX = "_compressed"
-    private const val RENAME_PREFIX = "wy_"
+    private const val RENAME_PREFIX = "wallpaper_"
 
     data class ProcessResult(
         val uri: Uri,
