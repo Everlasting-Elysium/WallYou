@@ -65,6 +65,10 @@ object LocalWallpaperHelper {
     }
 
     private val DocumentFile.isImage get() = type?.startsWith("image/") ?: false
+    private val DocumentFile.isUsed: Boolean get() {
+        val name = name ?: return false
+        return name.substringBeforeLast('.').endsWith(USED_SUFFIX)
+    }
 
     fun toStableKey(wallpaper: LocalWallpaper): String {
         val segments = wallpaper.relativeDirSegments + (wallpaper.file.name ?: "")
@@ -80,7 +84,7 @@ object LocalWallpaperHelper {
             }
         }
             .flatten()
-            .filter { it.file.isImage }
+            .filter { it.file.isImage && !it.file.isUsed }
     }
 
     // ── On-demand rename + compression ──────────────────────────────
@@ -91,6 +95,7 @@ object LocalWallpaperHelper {
     private const val ORIGINALS_RETAIN_DAYS = 7
     private const val COMPRESSED_SUFFIX = "_compressed"
     private const val RENAME_PREFIX = "wallpaper_"
+    private const val USED_SUFFIX = "_used"
 
     data class ProcessResult(
         val uri: Uri,
@@ -98,9 +103,11 @@ object LocalWallpaperHelper {
     )
 
     /**
-     * Rename the wallpaper file to the current timestamp.
-     * If the long side exceeds [MAX_LONG_SIDE], also compress it
-     * (backing up the original to wallpaper_originals/).
+     * Process the wallpaper file: rename to timestamp format and mark as used
+     * by including [USED_SUFFIX] in the filename. If the image height exceeds
+     * [MAX_HEIGHT], also compress it (backing up the original to wallpaper_originals/).
+     *
+     * Files already processed (with [RENAME_PREFIX]) just get the [USED_SUFFIX] added.
      *
      * @return [ProcessResult] with the final URI and the new stable key.
      */
@@ -109,9 +116,10 @@ object LocalWallpaperHelper {
         val oldKey = toStableKey(wallpaper)
         val rawName = file.name ?: return ProcessResult(file.uri, oldKey)
 
-        // Already processed (has our prefix) — skip rename/compress
+        // Already processed (has our prefix) — just add _used marker
         if (rawName.startsWith(RENAME_PREFIX)) {
-            return ProcessResult(file.uri, oldKey)
+            return markFileUsed(file, wallpaper.relativeDirSegments)
+                ?: ProcessResult(file.uri, oldKey)
         }
 
         val timestamp = System.currentTimeMillis()
@@ -124,7 +132,6 @@ object LocalWallpaperHelper {
 
         val origWidth = opts.outWidth
         val origHeight = opts.outHeight
-        val longSide = if (origWidth > 0 && origHeight > 0) maxOf(origWidth, origHeight) else 0
         val needsCompress = origHeight > 0 && origHeight > MAX_HEIGHT
 
         return if (needsCompress) {
@@ -135,7 +142,35 @@ object LocalWallpaperHelper {
     }
 
     /**
-     * Rename the file to {timestamp}.{ext} without compressing.
+     * Add [USED_SUFFIX] to a file that already has the [RENAME_PREFIX].
+     * Uses the existing [DocumentFile] reference — no findFile() needed.
+     */
+    private fun markFileUsed(
+        file: DocumentFile,
+        relativeDirSegments: List<String>,
+    ): ProcessResult? {
+        val fileName = file.name ?: return null
+        if (fileName.substringBeforeLast('.').endsWith(USED_SUFFIX)) {
+            // Already marked as used
+            val key = (relativeDirSegments + fileName).joinToString("/")
+            return ProcessResult(file.uri, key)
+        }
+        val stem = fileName.substringBeforeLast('.')
+        val ext = fileName.substringAfterLast('.', "")
+        val usedName = if (ext.isNotEmpty()) "${stem}${USED_SUFFIX}.${ext}" else "${stem}${USED_SUFFIX}"
+
+        if (file.renameTo(usedName)) {
+            val newKey = (relativeDirSegments + usedName).joinToString("/")
+            Log.d(TAG, "Marked as used: $fileName -> $usedName")
+            return ProcessResult(file.uri, newKey)
+        }
+
+        Log.w(TAG, "Failed to mark as used: $fileName")
+        return null
+    }
+
+    /**
+     * Rename the file to {timestamp}_used.{ext} without compressing.
      */
     private fun renameOnly(
         context: Context,
@@ -145,7 +180,7 @@ object LocalWallpaperHelper {
     ): ProcessResult {
         val oldKey = toStableKey(wallpaper)
         val ext = rawName.substringAfterLast('.', "")
-        val newFileName = if (ext.isNotEmpty()) "${RENAME_PREFIX}${timestamp}.${ext}" else "${RENAME_PREFIX}$timestamp"
+        val newFileName = if (ext.isNotEmpty()) "${RENAME_PREFIX}${timestamp}${USED_SUFFIX}.${ext}" else "${RENAME_PREFIX}${timestamp}${USED_SUFFIX}"
         val newKey = (wallpaper.relativeDirSegments + newFileName).joinToString("/")
 
         // Fast path: renameTo only touches metadata, no data copy
@@ -185,7 +220,7 @@ object LocalWallpaperHelper {
     }
 
     /**
-     * Backup the original, compress, and write to {timestamp}_compressed.jpg.
+     * Backup the original, compress, and write to {timestamp}_compressed_used.jpg.
      */
     private fun compressAndRename(
         context: Context,
@@ -230,7 +265,7 @@ object LocalWallpaperHelper {
             // Backup original to wallpaper_originals/
             if (!backupOriginal(context, wallpaper)) return ProcessResult(file.uri, oldKey)
 
-            val displayName = "${RENAME_PREFIX}${timestamp}${COMPRESSED_SUFFIX}"
+            val displayName = "${RENAME_PREFIX}${timestamp}${COMPRESSED_SUFFIX}${USED_SUFFIX}"
             val parentDir = getParentDir(wallpaper) ?: return ProcessResult(file.uri, oldKey)
 
             // Delete any leftover with same name to avoid SAF duplicates
@@ -319,6 +354,60 @@ object LocalWallpaperHelper {
                 ?: return null
         }
         return dir
+    }
+
+
+    /**
+     * Remove the [USED_SUFFIX] marker from all wallpaper files across the
+     * configured local folders, making every wallpaper available again.
+     */
+    fun resetUsedMarkers(context: Context, config: WallpaperConfig) {
+        for (uriString in config.localFolderUris) {
+            try {
+                val rootDir = DocumentFile.fromTreeUri(context, uriString.toUri()) ?: continue
+                resetUsedInDir(context, rootDir)
+            } catch (e: Exception) {
+                Log.w(TAG, "Reset used markers failed for $uriString", e)
+            }
+        }
+    }
+
+    private fun resetUsedInDir(context: Context, dir: DocumentFile) {
+        for (child in dir.listFiles()) {
+            if (child.isDirectory) {
+                val name = child.name.orEmpty()
+                if (name.startsWith(".") ||
+                    name == USED_DIR_NAME || name == TRASH_DIR_NAME || name == ORIGINALS_DIR_NAME
+                ) continue
+                resetUsedInDir(context, child)
+            } else if (child.isUsed) {
+                val name = child.name ?: continue
+                val stem = name.substringBeforeLast('.')
+                val ext = name.substringAfterLast('.', "")
+                val newStem = stem.removeSuffix(USED_SUFFIX)
+                val newName = if (ext.isNotEmpty()) "$newStem.$ext" else newStem
+
+                if (child.renameTo(newName)) {
+                    Log.d(TAG, "Reset used marker: $name -> $newName")
+                } else {
+                    // Fallback: copy + delete (rare)
+                    try {
+                        val mimeType = child.type ?: "application/octet-stream"
+                        dir.findFile(newName)?.delete()
+                        val newFile = dir.createFile(mimeType, newStem) ?: continue
+                        context.contentResolver.openInputStream(child.uri)?.use { input ->
+                            context.contentResolver.openOutputStream(newFile.uri)?.use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        child.delete()
+                        Log.d(TAG, "Reset used marker: $name -> $newName (copy+delete fallback)")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to reset used marker: $name", e)
+                    }
+                }
+            }
+        }
     }
 
     // ── Originals cleanup ───────────────────────────────────────────

@@ -28,7 +28,6 @@ class DeleteWallpaperTileService : TileService() {
         super.onClick()
 
         val uriString = Preferences.getCurrentWallpaperUri()
-        val key = Preferences.getCurrentWallpaperKey()
 
         if (uriString != null) {
             val safUri = uriString.toUri()
@@ -48,13 +47,6 @@ class DeleteWallpaperTileService : TileService() {
                 }
             }
 
-            // Clean up internal state
-            if (key != null) {
-                val configs = Preferences.getWallpaperConfigs()
-                for (config in configs) {
-                    ShuffleQueue.removeKey(this, "wallpaper_config_${config.id}", key)
-                }
-            }
             Preferences.setCurrentWallpaper(null, null, null)
         }
 

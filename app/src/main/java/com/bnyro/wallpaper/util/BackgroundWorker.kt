@@ -72,21 +72,22 @@ class BackgroundWorker(
     }
 
     /**
-     * LOCAL wallpaper flow: pick → load bitmap → set wallpaper → THEN rename/compress.
-     * This ensures file changes only happen after wallpaper is successfully applied.
+     * LOCAL wallpaper flow: pick from unused pool → load bitmap → set wallpaper
+     * → rename/compress with _used marker in one step.
+     * When the pool is empty, all "_used" markers are removed to reset the cycle.
      */
     private suspend fun runLocalChanger(config: WallpaperConfig): Boolean {
         return try {
-            val wallpapers = LocalWallpaperHelper.getLocalWalls(applicationContext, config)
-            if (wallpapers.isEmpty()) return false
+            var wallpapers = LocalWallpaperHelper.getLocalWalls(applicationContext, config)
 
-            val keyMap = wallpapers.associateBy { LocalWallpaperHelper.toStableKey(it) }
-            val queueName = "wallpaper_config_${config.id}"
-            val pickedKey = ShuffleQueue.pickNext(
-                applicationContext, queueName, keyMap.keys
-            ) ?: return false
+            // All wallpapers have been used – clear _used markers and rescan
+            if (wallpapers.isEmpty()) {
+                LocalWallpaperHelper.resetUsedMarkers(applicationContext, config)
+                wallpapers = LocalWallpaperHelper.getLocalWalls(applicationContext, config)
+                if (wallpapers.isEmpty()) return false
+            }
 
-            val selected = keyMap[pickedKey] ?: return false
+            val selected = wallpapers.random()
 
             // 1. Load bitmap from ORIGINAL file (no file changes yet)
             val bitmap = ImageHelper.getLocalImage(applicationContext, selected.file.uri)
@@ -95,15 +96,10 @@ class BackgroundWorker(
             // 2. Set wallpaper — if this fails, original file is untouched
             applyWallpaper(config, bitmap)
 
-            // 3. Only after success: rename/compress/backup
+            // 3. Only after success: rename/compress and mark as used in one step
             val result = LocalWallpaperHelper.processWallpaper(applicationContext, selected)
 
-            // 4. Sync ShuffleQueue if key changed
-            if (result.newKey != pickedKey) {
-                ShuffleQueue.replaceKey(applicationContext, queueName, pickedKey, result.newKey)
-            }
-
-            // 5. Record metadata for tile actions
+            // 4. Record metadata for tile actions
             Preferences.setCurrentWallpaper(
                 key = result.newKey,
                 uri = result.uri.toString(),

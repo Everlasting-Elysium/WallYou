@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +60,7 @@ import com.bnyro.wallpaper.ui.components.prefs.ListPreference
 import com.bnyro.wallpaper.ui.components.prefs.SettingsCategory
 import com.bnyro.wallpaper.ui.models.MainModel
 import com.bnyro.wallpaper.util.BackupHelper
+import com.bnyro.wallpaper.util.LocalWallpaperHelper
 import com.bnyro.wallpaper.util.Preferences
 import com.bnyro.wallpaper.util.ShuffleQueue
 import com.bnyro.wallpaper.util.WorkerHelper
@@ -66,6 +68,7 @@ import com.bnyro.wallpaper.widget.WallpaperWidgetProvider
 import com.bnyro.wallpaper.widget.WidgetPrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -198,13 +201,34 @@ fun SettingsPage(
                     wallpaperConfigs.forEachIndexed { index, wallpaperConfig ->
                         Spacer(modifier = Modifier.height(5.dp))
 
+                        var remainingCount by remember(wallpaperConfig) {
+                            mutableStateOf<Int?>(null)
+                        }
+                        LaunchedEffect(wallpaperConfig) {
+                            if (wallpaperConfig.source == WallpaperSource.LOCAL &&
+                                wallpaperConfig.localFolderUris.isNotEmpty()
+                            ) {
+                                val count = withContext(Dispatchers.IO) {
+                                    LocalWallpaperHelper.getLocalWalls(context, wallpaperConfig).size
+                                }
+                                remainingCount = count
+                            }
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(start = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = wallpaperConfig.getSummary(context))
-
-                            Spacer(modifier = Modifier.weight(1f))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = wallpaperConfig.getSummary(context))
+                                if (wallpaperConfig.source == WallpaperSource.LOCAL && remainingCount != null) {
+                                    Text(
+                                        text = stringResource(R.string.remaining_local_images, remainingCount!!),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
 
                             ButtonWithIcon(
                                 icon = Icons.Default.Edit

@@ -78,6 +78,7 @@
     <string name="online">Online</string>
     <string name="local">Local</string>
     <string name="choose_dir">Add directory</string>
+    <string name="remaining_local_images">%1$d remaining</string>
     <string name="directories">Directories</string>
     <!-- Theme -->
     <string name="theme_mode">Theme</string>
@@ -118,10 +119,11 @@
     <string name="widget_description">Resizable widget: transparent, text, or image mode</string>
     <string name="widget_config_title">Configure Widget</string>
     <string name="widget_mode_transparent">Transparent</string>
-    <string name="widget_mode_text">Text (random line)</string>
+    <string name="widget_mode_text">Text / Q&amp;A card</string>
     <string name="widget_mode_image">Image</string>
     <string name="widget_select_txt">Select text file</string>
     <string name="widget_txt_selected">File selected</string>
+    <string name="widget_txt_format_hint">Format: one entry per line.\nQuestion only: What is the capital of France?\nQ&amp;A: What is the capital of France?|Paris</string>
     <string name="widget_confirm">Confirm</string>
     <string name="widget_no_txt_selected">Please select a text file first</string>
     <string name="widget_refresh_interval">Refresh interval: %d min</string>

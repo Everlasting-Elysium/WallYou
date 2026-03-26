@@ -173,6 +173,12 @@ private fun ConfigScreen(
                         }
                     )
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.widget_txt_format_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             if (selectedMode == WidgetPrefs.MODE_TEXT || selectedMode == WidgetPrefs.MODE_IMAGE) {

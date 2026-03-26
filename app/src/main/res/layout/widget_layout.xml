@@ -3,9 +3,7 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent"
-    android:clickable="true"
-    android:focusable="true">
+    android:background="@android:color/transparent">
 
     <ImageView
         android:id="@+id/widget_image"
@@ -28,5 +26,41 @@
         android:shadowDy="1"
         android:shadowRadius="3"
         android:visibility="gone" />
+
+    <!--
+        Click overlay: 4 equal zones
+        Text mode:  [change wallpaper | next Q&A | show/hide answer | open image]
+        Other modes:[change wallpaper | change wallpaper | open image  | open image ]
+    -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:id="@+id/widget_click_change"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <FrameLayout
+            android:id="@+id/widget_click_next"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <FrameLayout
+            android:id="@+id/widget_click_answer"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <FrameLayout
+            android:id="@+id/widget_click_open"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+    </LinearLayout>
 
 </FrameLayout>

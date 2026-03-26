@@ -6,6 +6,13 @@ plugins {
     id("kotlinx-serialization")
 }
 
+import java.util.Properties
+
+val localProps = Properties().also {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) it.load(f.inputStream())
+}
+
 android {
     namespace = "com.bnyro.wallpaper"
     compileSdk = 35
@@ -30,9 +37,19 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file(localProps["RELEASE_STORE_FILE"] as String)
+            storePassword = localProps["RELEASE_STORE_PASSWORD"] as String
+            keyAlias = localProps["RELEASE_KEY_ALIAS"] as String
+            keyPassword = localProps["RELEASE_KEY_PASSWORD"] as String
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                     getDefaultProguardFile("proguard-android-optimize.txt"),
                     "proguard-rules.pro"
