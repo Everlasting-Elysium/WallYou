@@ -78,6 +78,28 @@
         </service>
 
         <service
+            android:name=".util.MoveWallpaperTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_move_wallpaper"
+            android:label="@string/move_to_safe_folder"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".util.SafeModeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_safe_mode"
+            android:label="@string/safe_mode"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
             android:name=".util.OpenWallpaperTileService"
             android:exported="true"
             android:icon="@drawable/ic_qs_open_wallpaper"

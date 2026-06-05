@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AccessTimeFilled
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -51,10 +53,12 @@ import com.bnyro.wallpaper.R
 import com.bnyro.wallpaper.enums.ThemeMode
 import com.bnyro.wallpaper.enums.WallpaperSource
 import com.bnyro.wallpaper.ext.formatBinarySize
+import com.bnyro.wallpaper.ext.formatTime
 import com.bnyro.wallpaper.obj.WallpaperConfig
 import com.bnyro.wallpaper.ui.components.ButtonWithIcon
 import com.bnyro.wallpaper.ui.components.WallpaperChangerPrefDialog
 import com.bnyro.wallpaper.ui.components.about.AboutContainer
+import com.bnyro.wallpaper.ui.components.dialogs.TimePickerDialog
 import com.bnyro.wallpaper.ui.components.prefs.CheckboxPref
 import com.bnyro.wallpaper.ui.components.prefs.ListPreference
 import com.bnyro.wallpaper.ui.components.prefs.SettingsCategory
@@ -296,6 +300,105 @@ fun SettingsPage(
                             },
                             onDismissRequest = { newWallpaperConfig = null }
                         )
+                    }
+                }
+            }
+        }
+
+        AboutContainer {
+            Column {
+                SettingsCategory(
+                    title = stringResource(R.string.safe_mode)
+                )
+                Spacer(modifier = Modifier.height(5.dp))
+                Text(
+                    text = stringResource(R.string.safe_mode_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+                Spacer(modifier = Modifier.height(5.dp))
+
+                CheckboxPref(
+                    prefKey = Preferences.safeModeActiveKey,
+                    title = stringResource(R.string.safe_mode_manual)
+                )
+
+                var safeModeScheduleEnabled by remember {
+                    mutableStateOf(Preferences.getBoolean(Preferences.safeModeScheduleEnabledKey, false))
+                }
+                CheckboxPref(
+                    prefKey = Preferences.safeModeScheduleEnabledKey,
+                    title = stringResource(R.string.safe_mode_schedule),
+                    summary = stringResource(R.string.safe_mode_schedule_desc)
+                ) { newValue ->
+                    safeModeScheduleEnabled = newValue
+                    if (!newValue) {
+                        Preferences.edit {
+                            putLong(Preferences.safeModeScheduleStartKey, -1)
+                            putLong(Preferences.safeModeScheduleEndKey, -1)
+                        }
+                    } else {
+                        // Write initial values so BackgroundWorker can read them
+                        val existingStart = Preferences.getLong(Preferences.safeModeScheduleStartKey, -1)
+                        if (existingStart < 0) {
+                            Preferences.edit {
+                                putLong(Preferences.safeModeScheduleStartKey, 0)
+                                putLong(Preferences.safeModeScheduleEndKey, 0)
+                            }
+                        }
+                    }
+                }
+
+                AnimatedVisibility(visible = safeModeScheduleEnabled) {
+                    var scheduleStart by remember {
+                        mutableStateOf(Preferences.getLong(Preferences.safeModeScheduleStartKey, 0))
+                    }
+                    var scheduleEnd by remember {
+                        mutableStateOf(Preferences.getLong(Preferences.safeModeScheduleEndKey, 0))
+                    }
+                    var showStartPicker by remember { mutableStateOf(false) }
+                    var showEndPicker by remember { mutableStateOf(false) }
+
+                    Row(
+                        modifier = Modifier.padding(start = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccessTimeFilled,
+                            contentDescription = null
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Button(onClick = { showStartPicker = true }) {
+                            Text(scheduleStart.formatTime())
+                        }
+                        Icon(
+                            modifier = Modifier.padding(horizontal = 10.dp),
+                            imageVector = Icons.AutoMirrored.Default.ArrowForward,
+                            contentDescription = null
+                        )
+                        Button(onClick = { showEndPicker = true }) {
+                            Text(scheduleEnd.formatTime())
+                        }
+                    }
+
+                    if (showStartPicker) {
+                        TimePickerDialog(
+                            scheduleStart,
+                            onTimeChange = {
+                                scheduleStart = it
+                                Preferences.edit { putLong(Preferences.safeModeScheduleStartKey, it) }
+                            }
+                        ) { showStartPicker = false }
+                    }
+                    if (showEndPicker) {
+                        TimePickerDialog(
+                            scheduleEnd,
+                            onTimeChange = {
+                                scheduleEnd = it
+                                Preferences.edit { putLong(Preferences.safeModeScheduleEndKey, it) }
+                            }
+                        ) { showEndPicker = false }
                     }
                 }
             }

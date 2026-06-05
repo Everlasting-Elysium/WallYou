@@ -137,4 +137,13 @@
     <string name="delete_current_wallpaper">Delete wallpaper</string>
     <string name="delete_current_text">Delete text</string>
     <string name="open_current_wallpaper">Open wallpaper</string>
+    <string name="move_to_safe_folder">Move to safe folder</string>
+    <!-- Safe Mode -->
+    <string name="safe_mode">Safe mode</string>
+    <string name="safe_mode_manual">Enable safe mode</string>
+    <string name="safe_mode_schedule">Auto schedule</string>
+    <string name="safe_mode_schedule_desc">Activate safe mode between specified times</string>
+    <string name="safe_mode_only">Safe mode only</string>
+    <string name="safe_mode_only_desc">This rule runs only when safe mode is active</string>
+    <string name="safe_mode_hint">When active, only rules marked \"Safe mode only\" will run</string>
 </resources>

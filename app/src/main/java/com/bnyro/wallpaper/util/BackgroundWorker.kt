@@ -18,12 +18,12 @@ class BackgroundWorker(
 ) : CoroutineWorker(applicationContext, workerParameters) {
     override suspend fun doWork(): Result {
         val wallpaperConfigs = Preferences.getWallpaperConfigs()
+        val safeModeActive = Preferences.isSafeModeActive()
 
         val configId = workerParameters.inputData.getInt(WorkerHelper.WALLPAPER_CONFIG_ID, -1)
         if (configId == -1) {
-            for (config in wallpaperConfigs) {
-                runWallpaperChanger(config)
-            }
+            val eligible = wallpaperConfigs.filter { !(safeModeActive && !it.safeOnly) }
+            eligible.randomOrNull()?.let { runWallpaperChanger(it) }
             LocalWallpaperHelper.cleanupOldOriginals(applicationContext)
             return Result.success()
         }
@@ -31,6 +31,8 @@ class BackgroundWorker(
         val config = wallpaperConfigs.firstOrNull {
             it.id == configId
         } ?: return Result.success()
+
+        if (safeModeActive && !config.safeOnly) return Result.success()
 
         val nowMillis = TimeHelper.timeTodayInMillis()
         if (config.startTimeMillis != null && config.endTimeMillis != null &&

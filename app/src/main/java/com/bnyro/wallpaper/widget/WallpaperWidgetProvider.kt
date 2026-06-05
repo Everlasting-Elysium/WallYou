@@ -357,7 +357,10 @@ class WallpaperWidgetProvider : AppWidgetProvider() {
 
         private fun loadImageForWidget(context: Context): Bitmap? {
             val configs = Preferences.getWallpaperConfigs()
-            val localConfig = configs.firstOrNull { it.source == WallpaperSource.LOCAL }
+            val safeModeActive = Preferences.isSafeModeActive()
+            val localConfig = configs.firstOrNull {
+                it.source == WallpaperSource.LOCAL && (!safeModeActive || it.safeOnly)
+            }
 
             if (localConfig != null && localConfig.localFolderUris.isNotEmpty()) {
                 return try {

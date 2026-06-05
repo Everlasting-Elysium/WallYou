@@ -21,6 +21,11 @@ object Preferences {
     const val brightnessKey = "brightness"
     const val autoLightenDarkenKey = "autoLightenDarken"
 
+    const val safeModeActiveKey = "safeModeActive"
+    const val safeModeScheduleEnabledKey = "safeModeScheduleEnabled"
+    const val safeModeScheduleStartKey = "safeModeScheduleStart"
+    const val safeModeScheduleEndKey = "safeModeScheduleEnd"
+
     private const val currentWallpaperKeyPref = "current_wallpaper_key"
     private const val currentWallpaperUriPref = "current_wallpaper_uri"
     private const val currentWallpaperFolderUriPref = "current_wallpaper_folder_uri"
@@ -42,6 +47,7 @@ object Preferences {
     fun getString(key: String, defValue: String) = preferences.getString(key, defValue) ?: defValue
 
     fun getFloat(key: String, defValue: Float) = preferences.getFloat(key, defValue)
+    fun getLong(key: String, defValue: Long) = preferences.getLong(key, defValue)
 
     fun edit(action: SharedPreferences.Editor.() -> Unit) {
         preferences.edit().apply(action).apply()
@@ -72,6 +78,15 @@ object Preferences {
             putString(currentWallpaperUriPref, uri)
             putString(currentWallpaperFolderUriPref, folderUri)
         }
+    }
+
+    fun isSafeModeActive(): Boolean {
+        if (getBoolean(safeModeActiveKey, false)) return true
+        if (!getBoolean(safeModeScheduleEnabledKey, false)) return false
+        val start = getLong(safeModeScheduleStartKey, -1)
+        val end = getLong(safeModeScheduleEndKey, -1)
+        if (start < 0 || end < 0) return false
+        return TimeHelper.isInTimeRange(TimeHelper.timeTodayInMillis(), start, end)
     }
 
     fun getCurrentWallpaperKey(): String? = preferences.getString(currentWallpaperKeyPref, null)

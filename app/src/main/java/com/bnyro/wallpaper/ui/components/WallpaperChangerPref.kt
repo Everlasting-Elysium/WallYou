@@ -82,6 +82,9 @@ fun WallpaperChangerPrefDialog(
     var applyImageFilters by remember {
         mutableStateOf(config.applyImageFilters)
     }
+    var safeOnly by remember {
+        mutableStateOf(config.safeOnly)
+    }
     var startTimeMillis by remember {
         mutableStateOf(config.startTimeMillis)
     }
@@ -120,6 +123,7 @@ fun WallpaperChangerPrefDialog(
                     applyImageFilters = applyImageFilters,
                     startTimeMillis = if (hasStartAndEndTime) startTimeMillis else null,
                     endTimeMillis = if (hasStartAndEndTime) endTimeMillis else null,
+                    safeOnly = safeOnly,
                 )
                 onConfigChange(newConfig)
                 onDismissRequest()
@@ -274,6 +278,15 @@ fun WallpaperChangerPrefDialog(
                     defaultValue = applyImageFilters
                 ) { newValue ->
                     applyImageFilters = newValue
+                }
+
+                CheckboxPref(
+                    prefKey = null,
+                    title = stringResource(R.string.safe_mode_only),
+                    summary = stringResource(R.string.safe_mode_only_desc),
+                    defaultValue = safeOnly
+                ) { newValue ->
+                    safeOnly = newValue
                 }
 
                 var customTimeInterval by remember {

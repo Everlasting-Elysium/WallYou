@@ -21,6 +21,7 @@ data class WallpaperConfig(
     var localFolderUris: List<String> = listOf(),
     var startTimeMillis: Long? = null,
     var endTimeMillis: Long? = null,
+    var safeOnly: Boolean = false,
 ) {
     fun getSummary(context: Context): String {
         val targetString = when (target) {
@@ -34,8 +35,9 @@ data class WallpaperConfig(
             WallpaperSource.FAVORITES -> R.string.favorites
         }
 
-        return "${context.getString(sourceString)} - ${context.getString(targetString)} (${
+        val base = "${context.getString(sourceString)} - ${context.getString(targetString)} (${
             changeIntervalMinutes.toLong().formatMinutes()
         })"
+        return if (safeOnly) "\uD83D\uDEE1\uFE0F $base" else base
     }
 }
