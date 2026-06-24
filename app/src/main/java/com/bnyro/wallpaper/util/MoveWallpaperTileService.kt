@@ -71,11 +71,18 @@ class MoveWallpaperTileService : TileService() {
             val sourceFile = DocumentFile.fromSingleUri(this, fileUri) ?: return false
             val destDir = DocumentFile.fromTreeUri(this, safeFolderUri.toUri()) ?: return false
 
-            val fileName = sourceFile.name ?: "wallpaper_${System.currentTimeMillis()}"
+            val rawName = sourceFile.name ?: "wallpaper_${System.currentTimeMillis()}"
+            val ext = rawName.substringAfterLast('.', "")
+            // Strip processing artifacts so the safe-folder copy isn't permanently
+            // excluded by the _used filter (which would shrink the rotation pool).
+            val cleanStem = rawName.substringBeforeLast('.')
+                .removeSuffix(LocalWallpaperHelper.USED_SUFFIX)
+                .removeSuffix(LocalWallpaperHelper.COMPRESSED_SUFFIX)
+            val cleanName = if (ext.isNotEmpty()) "$cleanStem.$ext" else cleanStem
             val mimeType = sourceFile.type ?: "image/*"
 
-            destDir.findFile(fileName)?.delete()
-            val destFile = destDir.createFile(mimeType, fileName.substringBeforeLast('.'))
+            destDir.findFile(cleanName)?.delete()
+            val destFile = destDir.createFile(mimeType, cleanStem)
                 ?: return false
 
             contentResolver.openInputStream(sourceFile.uri)?.use { input ->
@@ -85,7 +92,7 @@ class MoveWallpaperTileService : TileService() {
             }
 
             sourceFile.delete()
-            Log.d(TAG, "Moved $fileName to safe folder")
+            Log.d(TAG, "Moved $cleanName to safe folder")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to move wallpaper to safe folder", e)

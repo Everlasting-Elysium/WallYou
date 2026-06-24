@@ -23,7 +23,16 @@ class BackgroundWorker(
         val configId = workerParameters.inputData.getInt(WorkerHelper.WALLPAPER_CONFIG_ID, -1)
         if (configId == -1) {
             val eligible = wallpaperConfigs.filter { !(safeModeActive && !it.safeOnly) }
-            eligible.randomOrNull()?.let { runWallpaperChanger(it) }
+            // When every eligible config is LOCAL, merge their pools so each IMAGE has
+            // equal probability (not each config). Otherwise `eligible.random()` would
+            // pick a 50-image folder as often as a 5000-image folder → small folder dominates.
+            val allLocal = eligible.isNotEmpty() &&
+                    eligible.all { it.source == WallpaperSource.LOCAL }
+            if (allLocal) {
+                runUnifiedLocalChanger(eligible)
+            } else {
+                eligible.randomOrNull()?.let { runWallpaperChanger(it) }
+            }
             LocalWallpaperHelper.cleanupOldOriginals(applicationContext)
             return Result.success()
         }
@@ -89,7 +98,15 @@ class BackgroundWorker(
                 if (wallpapers.isEmpty()) return false
             }
 
-            val selected = wallpapers.random()
+            // Exclude the just-shown image so it can't immediately repeat after a pool
+            // reset (stableLocalId survives the _used rename, so the match still holds).
+            val lastStableId = Preferences.getLastLocalStableId(config.id)
+            val candidates = if (wallpapers.size > 1 && lastStableId != null) {
+                wallpapers.filterNot { LocalWallpaperHelper.stableLocalId(it) == lastStableId }
+                    .takeIf { it.isNotEmpty() } ?: wallpapers
+            } else wallpapers
+
+            val selected = candidates.random()
 
             // 1. Load bitmap from ORIGINAL file (no file changes yet)
             val bitmap = ImageHelper.getLocalImage(applicationContext, selected.file.uri)
@@ -101,7 +118,13 @@ class BackgroundWorker(
             // 3. Only after success: rename/compress and mark as used in one step
             val result = LocalWallpaperHelper.processWallpaper(applicationContext, selected)
 
-            // 4. Record metadata for tile actions
+            // 4. Remember this pick (stable across future resets) to block immediate repeats
+            Preferences.setLastLocalStableId(
+                config.id,
+                LocalWallpaperHelper.stableIdFromResult(result.newKey, selected.rootDir.uri.toString())
+            )
+
+            // 5. Record metadata for tile actions
             Preferences.setCurrentWallpaper(
                 key = result.newKey,
                 uri = result.uri.toString(),
@@ -113,6 +136,68 @@ class BackgroundWorker(
             Log.e(this@BackgroundWorker::class.simpleName, e.toString())
             false
         }
+    }
+
+    /**
+     * Cross-config LOCAL changer for manual triggers (widget/tile). Flattens all
+     * eligible configs' wallpapers into one global pool so every image has equal
+     * probability — large folders dominate selection, small folders no longer get
+     * over-picked due to the per-config uniform random.
+     */
+    private suspend fun runUnifiedLocalChanger(configs: List<WallpaperConfig>): Boolean {
+        return try {
+            var pool = configs.flatMap { cfg ->
+                LocalWallpaperHelper.getLocalWalls(applicationContext, cfg).map { it to cfg }
+            }
+
+            if (pool.isEmpty()) {
+                // Every config's unused pool is drained — reset all, then rescan.
+                configs.forEach { LocalWallpaperHelper.resetUsedMarkers(applicationContext, it) }
+                pool = configs.flatMap { cfg ->
+                    LocalWallpaperHelper.getLocalWalls(applicationContext, cfg).map { it to cfg }
+                }
+                if (pool.isEmpty()) return false
+            }
+
+            // Exclude the previously shown image regardless of which config it came from.
+            val lastStableId = Preferences.getLastGlobalLocalStableId()
+            val candidates = if (pool.size > 1 && lastStableId != null) {
+                pool.filterNot { (w, _) -> LocalWallpaperHelper.stableLocalId(w) == lastStableId }
+                    .takeIf { it.isNotEmpty() } ?: pool
+            } else pool
+
+            val (selected, selectedConfig) = candidates.random()
+
+            val bitmap = ImageHelper.getLocalImage(applicationContext, selected.file.uri)
+                ?: return false
+
+            applyWallpaper(selectedConfig, bitmap)
+
+            val result = LocalWallpaperHelper.processWallpaper(applicationContext, selected)
+
+            rememberPick(result, selected, selectedConfig)
+            true
+        } catch (e: Exception) {
+            Log.e(this@BackgroundWorker::class.simpleName, e.toString())
+            false
+        }
+    }
+
+    private fun rememberPick(
+        result: LocalWallpaperHelper.ProcessResult,
+        selected: LocalWallpaperHelper.LocalWallpaper,
+        selectedConfig: WallpaperConfig,
+    ) {
+        val newStableId = LocalWallpaperHelper.stableIdFromResult(
+            result.newKey, selected.rootDir.uri.toString()
+        )
+        Preferences.setLastGlobalLocalStableId(newStableId)
+        Preferences.setLastLocalStableId(selectedConfig.id, newStableId)
+        Preferences.setCurrentWallpaper(
+            key = result.newKey,
+            uri = result.uri.toString(),
+            folderUri = selected.rootDir.uri.toString()
+        )
     }
 
     private suspend fun getOnlineWallpaper(config: WallpaperConfig): Bitmap? {

@@ -92,4 +92,19 @@ object Preferences {
     fun getCurrentWallpaperKey(): String? = preferences.getString(currentWallpaperKeyPref, null)
     fun getCurrentWallpaperUri(): String? = preferences.getString(currentWallpaperUriPref, null)
     fun getCurrentWallpaperFolderUri(): String? = preferences.getString(currentWallpaperFolderUriPref, null)
+
+    private fun lastLocalStableIdKey(configId: Int) = "last_local_stable_id_$configId"
+    private const val lastGlobalLocalStableIdKey = "last_global_local_stable_id"
+
+    fun getLastLocalStableId(configId: Int): String? =
+        preferences.getString(lastLocalStableIdKey(configId), null)
+
+    fun setLastLocalStableId(configId: Int, id: String) =
+        edit { putString(lastLocalStableIdKey(configId), id) }
+
+    fun getLastGlobalLocalStableId(): String? =
+        preferences.getString(lastGlobalLocalStableIdKey, null)
+
+    fun setLastGlobalLocalStableId(id: String) =
+        edit { putString(lastGlobalLocalStableIdKey, id) }
 }

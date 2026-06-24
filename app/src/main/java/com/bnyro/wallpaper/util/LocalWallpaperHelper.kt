@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.util.Log
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
@@ -35,7 +36,75 @@ object LocalWallpaperHelper {
         val relativeDirSegments: List<String>,
     )
 
+    data class ScanEntry(
+        val docId: String,
+        val name: String,
+        val mimeType: String,
+        val relativeDirSegments: List<String>,
+    )
+
     // ── Scanning ────────────────────────────────────────────────────
+
+    private fun isReservedDir(name: String): Boolean {
+        return name.startsWith(".") ||
+                name == USED_DIR_NAME || name == TRASH_DIR_NAME || name == ORIGINALS_DIR_NAME
+    }
+
+    private fun isUsedName(name: String): Boolean {
+        return name.substringBeforeLast('.').endsWith(USED_SUFFIX)
+    }
+
+    /**
+     * Bulk-scan files via ContentProvider query (faster than DocumentFile walk).
+     * Falls back to DocumentFile if the provider doesn't support bulk queries.
+     */
+    private fun bulkScanEntries(context: Context, treeUri: Uri): List<ScanEntry> {
+        return try {
+            bulkScanEntriesInternal(context, treeUri)
+        } catch (e: Exception) {
+            Log.w(TAG, "Bulk scan failed, falling back", e)
+            emptyList()
+        }
+    }
+
+    private fun bulkScanEntriesInternal(
+        context: Context,
+        treeUri: Uri,
+    ): List<ScanEntry> {
+        val results = mutableListOf<ScanEntry>()
+        val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
+        val queue = ArrayDeque<Pair<String, List<String>>>()
+        queue.addLast(rootDocId to emptyList())
+
+        while (queue.isNotEmpty()) {
+            val (parentDocId, relSegments) = queue.removeFirst()
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
+
+            context.contentResolver.query(childrenUri, null, null, null, null)?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val docId = cursor.getString(
+                        cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                    ) ?: continue
+                    val mimeType = cursor.getString(
+                        cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                    ) ?: continue
+                    val name = cursor.getString(
+                        cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                    ) ?: continue
+
+                    if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        if (!isReservedDir(name)) {
+                            queue.addLast(docId to (relSegments + name))
+                        }
+                    } else if (mimeType.startsWith("image/") && !isUsedName(name)) {
+                        results.add(ScanEntry(docId, name, mimeType, relSegments))
+                    }
+                }
+            }
+        }
+
+        return results
+    }
 
     /**
      * Recursively collect files under [directory], tracking the relative
@@ -75,16 +144,52 @@ object LocalWallpaperHelper {
         return segments.joinToString("/")
     }
 
+    /**
+     * Per-image identity that survives the _used rename/reset cycle, used to avoid
+     * picking the same wallpaper twice across a pool reset. The wallpaper_<ts> stem is
+     * frozen after first processing; only the _used suffix toggles, so stripping it
+     * yields a constant id. rootDir.uri prefix prevents cross-folder collisions.
+     */
+    fun stableLocalId(wallpaper: LocalWallpaper): String {
+        val stableName = stableFileName(wallpaper.file.name ?: "")
+        val relPath = (wallpaper.relativeDirSegments + stableName).joinToString("/")
+        return "${wallpaper.rootDir.uri}|$relPath"
+    }
+
+    fun stableIdFromResult(key: String, folderUri: String): String {
+        val parts = key.split("/")
+        val stableLast = stableFileName(parts.last())
+        val relPath = (parts.dropLast(1) + stableLast).joinToString("/")
+        return "$folderUri|$relPath"
+    }
+
+    private fun stableFileName(name: String): String {
+        val ext = name.substringAfterLast('.', "")
+        val stem = name.substringBeforeLast('.').removeSuffix(USED_SUFFIX)
+        return if (ext.isNotEmpty()) "$stem.$ext" else stem
+    }
+
     fun getLocalWalls(context: Context, config: WallpaperConfig): List<LocalWallpaper> {
         return config.localFolderUris.mapNotNull { uriString ->
-            val dir = DocumentFile.fromTreeUri(context, uriString.toUri())
-                ?: return@mapNotNull null
-            collectFiles(dir).map { (file, segments) ->
-                LocalWallpaper(file, dir, segments)
+            val treeUri = uriString.toUri()
+            val dir = DocumentFile.fromTreeUri(context, treeUri) ?: return@mapNotNull null
+            val entries = bulkScanEntries(context, treeUri)
+
+            if (entries.isNotEmpty()) {
+                // buildDocumentUriUsingTree keeps the /tree/<root>/ grant token, so the
+                // resulting TreeDocumentFile is write-capable. fromTreeUri is O(1) (no IPC).
+                entries.mapNotNull { entry ->
+                    val fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, entry.docId)
+                    val file = DocumentFile.fromTreeUri(context, fileUri) ?: return@mapNotNull null
+                    LocalWallpaper(file, dir, entry.relativeDirSegments)
+                }
+            } else {
+                // Fallback: original recursive DocumentFile walk
+                collectFiles(dir).map { (file, segments) ->
+                    LocalWallpaper(file, dir, segments)
+                }.filter { it.file.isImage && !it.file.isUsed }
             }
-        }
-            .flatten()
-            .filter { it.file.isImage && !it.file.isUsed }
+        }.flatten()
     }
 
     // ── On-demand rename + compression ──────────────────────────────
@@ -93,9 +198,9 @@ object LocalWallpaperHelper {
     const val MAX_HEIGHT = 4800
     private const val JPEG_QUALITY = 85
     private const val ORIGINALS_RETAIN_DAYS = 7
-    private const val COMPRESSED_SUFFIX = "_compressed"
+    internal const val COMPRESSED_SUFFIX = "_compressed"
     private const val RENAME_PREFIX = "wallpaper_"
-    private const val USED_SUFFIX = "_used"
+    internal const val USED_SUFFIX = "_used"
 
     data class ProcessResult(
         val uri: Uri,
