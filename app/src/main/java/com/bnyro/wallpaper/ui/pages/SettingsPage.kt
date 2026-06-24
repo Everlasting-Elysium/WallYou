@@ -6,7 +6,6 @@ import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context.POWER_SERVICE
 import android.content.Intent
-import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
@@ -174,13 +173,15 @@ fun SettingsPage(
             }
             CheckboxPref(
                 prefKey = Preferences.wallpaperChangerKey,
-                title = stringResource(R.string.wallpaper_changer)
+                title = stringResource(R.string.wallpaper_changer),
+                summary = stringResource(R.string.wallpaper_changer_summary)
             ) { newValue ->
                 wallpaperChangerEnabled = newValue
 
                 WorkerHelper.enqueueOrCancelAll(context, wallpaperConfigs)
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && newValue) {
+                // request unrestricted battery usage if not yet granted
+                if (newValue) {
                     val pm = context.getSystemService(POWER_SERVICE) as PowerManager
 
                     if (!pm.isIgnoringBatteryOptimizations(context.packageName)) {

@@ -5,7 +5,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.AreaChart
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.Deblur
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Nightlight
@@ -14,17 +16,16 @@ import androidx.compose.material.icons.filled.Pix
 import androidx.compose.material.icons.filled.ScreenLockLandscape
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Today
-import androidx.compose.material.icons.filled.Wallpaper
-import androidx.compose.material.icons.filled.WaterDamage
 import androidx.compose.material.icons.filled.WaterDrop
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import com.bnyro.wallpaper.db.DatabaseHolder
-import com.bnyro.wallpaper.util.WallpaperApiWrapper
 import com.bnyro.wallpaper.util.Preferences
+import com.bnyro.wallpaper.util.WallpaperApiWrapper
 import net.youapps.wallpaper_apis.RetrofitHelper
 import net.youapps.wallpaper_apis.bi.BingApi
+import net.youapps.wallpaper_apis.im.ImgthApi
 import net.youapps.wallpaper_apis.le.LemmyApi
 import net.youapps.wallpaper_apis.na.NasaPotdApi
 import net.youapps.wallpaper_apis.ow.OwallsApi
@@ -34,6 +35,7 @@ import net.youapps.wallpaper_apis.px.GooglePixelApi
 import net.youapps.wallpaper_apis.re.RedditApi
 import net.youapps.wallpaper_apis.sp.MicrosoftSpotlightApi
 import net.youapps.wallpaper_apis.us.UnsplashApi
+import net.youapps.wallpaper_apis.wc.WallpaperCaveApi
 import net.youapps.wallpaper_apis.wh.WallhavenApi
 import net.youapps.wallpaper_apis.wi.WikipediaPotdApi
 import net.youapps.wallpaper_apis.ze.ZedgeApi
@@ -77,6 +79,7 @@ class App : Application(), ImageLoaderFactory {
                 WallpaperApiWrapper(UnsplashApi(), Icons.Default.WaterDrop),
                 WallpaperApiWrapper(PixabayApi(), Icons.Default.Palette),
                 WallpaperApiWrapper(ZedgeApi(), Icons.Default.ScreenLockLandscape),
+                WallpaperApiWrapper(WallpaperCaveApi(), Icons.Default.Deblur),
                 WallpaperApiWrapper(BingApi(), Icons.Default.Nightlight),
                 WallpaperApiWrapper(RedditApi(), Icons.Default.Forum),
                 WallpaperApiWrapper(LemmyApi(), Icons.Default.Book),
@@ -84,7 +87,8 @@ class App : Application(), ImageLoaderFactory {
                 WallpaperApiWrapper(MicrosoftSpotlightApi(), Icons.Default.LightMode),
                 WallpaperApiWrapper(NasaPotdApi(), Icons.Default.Star),
                 WallpaperApiWrapper(WikipediaPotdApi(), Icons.Default.Today),
-                WallpaperApiWrapper(PicsumApi(), Icons.Default.AreaChart)
+                WallpaperApiWrapper(PicsumApi(), Icons.Default.AreaChart),
+                WallpaperApiWrapper(ImgthApi(), Icons.Default.GridView)
             )
         }
     }

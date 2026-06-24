@@ -21,7 +21,6 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,11 +33,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.bnyro.wallpaper.db.DatabaseHolder.Database
 import com.bnyro.wallpaper.db.obj.Wallpaper
 import com.bnyro.wallpaper.ui.models.MainModel
+import com.bnyro.wallpaper.util.ImageHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -51,6 +52,8 @@ fun WallpaperGrid(
     onDeleteWallpaper: ((Wallpaper) -> Unit)? = null,
     onScrollEnd: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+
     val listState = rememberLazyGridState()
     val scrollEnded by remember {
         derivedStateOf {
@@ -91,21 +94,17 @@ fun WallpaperGrid(
                 }
             }
 
-            val dismissState = rememberSwipeToDismissBoxState(
-                confirmValueChange = { value ->
-                    when (value) {
-                        SwipeToDismissBoxValue.StartToEnd -> onDeleteWallpaper?.invoke(wallpaper)
-                        else -> Unit // cancelled by user
-                    }
-                    false
-                }
-            )
+            val dismissState = rememberSwipeToDismissBoxState()
             SwipeToDismissBox(
                 state = dismissState,
                 backgroundContent = {
                     WallpaperDismissBackground(cornerShape = shape)
                 },
-                enableDismissFromStartToEnd = onDeleteWallpaper != null
+                enableDismissFromStartToEnd = onDeleteWallpaper != null,
+                enableDismissFromEndToStart = false,
+                onDismiss = {
+                    onDeleteWallpaper?.invoke(wallpaper)
+                }
             ) {
                 ElevatedCard(
                     modifier = Modifier
@@ -117,7 +116,7 @@ fun WallpaperGrid(
                 ) {
                     Box {
                         AsyncImage(
-                            model = wallpaper.preview,
+                            model = ImageHelper.buildRequest(context, wallpaper.preview),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier

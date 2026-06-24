@@ -1,5 +1,6 @@
 package com.bnyro.wallpaper.ui.components
 
+import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -8,12 +9,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -26,12 +24,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
@@ -42,11 +41,12 @@ import com.bnyro.wallpaper.enums.MultiState
 import com.bnyro.wallpaper.ext.rememberZoomState
 import com.bnyro.wallpaper.ext.zoomArea
 import com.bnyro.wallpaper.ext.zoomImage
-import com.bnyro.wallpaper.ui.components.bottombar.BottomBar
+import com.bnyro.wallpaper.ui.components.bottombar.WallpaperToolbar
 import com.bnyro.wallpaper.ui.components.bottombar.WallpaperViewTopBar
 import com.bnyro.wallpaper.ui.components.dialogs.MultiStateDialog
 import com.bnyro.wallpaper.ui.components.infosheet.WallpaperInfoSheet
 import com.bnyro.wallpaper.ui.models.WallpaperHelperModel
+import com.bnyro.wallpaper.util.ImageHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -59,6 +59,8 @@ fun WallpaperView(
     onClickBack: () -> Unit,
     wallpaperHelperModel: WallpaperHelperModel = viewModel(factory = WallpaperHelperModel.Factory)
 ) {
+    val context = LocalContext.current
+
     var showUi by showUiState()
     var showEditView by remember { mutableStateOf(false) }
     var showInfoSheet by remember { mutableStateOf(false) }
@@ -70,10 +72,15 @@ fun WallpaperView(
         }
     }
 
-    val launcher = rememberLauncherForActivityResult(
+    var cachedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    val saveImageLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("image/png")
     ) {
-        wallpaperHelperModel.saveWallpaper(wallpaper, uri = it)
+        wallpaperHelperModel.saveWallpaper(
+            cachedBitmap ?: return@rememberLauncherForActivityResult,
+            uri = it
+        )
     }
 
     Box(
@@ -95,7 +102,7 @@ fun WallpaperView(
             animationSpec = tween(500)
         )
         AsyncImage(
-            model = wallpaper.preview,
+            model = ImageHelper.buildRequest(context, wallpaper.preview),
             contentDescription = null,
             contentScale = ContentScale.FillBounds,
             modifier = Modifier
@@ -109,79 +116,74 @@ fun WallpaperView(
                 .zoomArea(zoomState),
             contentAlignment = Alignment.Center
         ) {
-            val lowRes = rememberAsyncImagePainter(model = wallpaper.preview)
+            val lowRes = rememberAsyncImagePainter(
+                model = ImageHelper.buildRequest(context, wallpaper.preview),
+                onSuccess = {
+                    if (cachedBitmap == null) cachedBitmap = it.result.drawable.toBitmap()
+                }
+            )
             AsyncImage(
-                model = wallpaper.imgSrc,
+                model = ImageHelper.buildRequest(context, wallpaper.imgSrc),
                 contentDescription = stringResource(id = R.string.wallpaper),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
                     .zoomImage(zoomState),
-                placeholder = lowRes
+                placeholder = lowRes,
+                // show when image fails to load
+                error = lowRes,
+                onSuccess = {
+                    cachedBitmap = it.result.drawable.toBitmap()
+                }
             )
-            Column(
-                Modifier
+            AnimatedVisibility(
+                modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.TopCenter)
+                    .align(Alignment.TopCenter),
+                visible = showUi
             ) {
-                AnimatedVisibility(
-                    visible = showUi
-                ) {
-                    WallpaperViewTopBar(
-                        onClickBack = onClickBack,
-                        onClickInfo = {
-                            showInfoSheet = true
-                        },
-                        title = wallpaper.title ?: stringResource(id = R.string.wallpaper)
-                    )
-                }
+                WallpaperViewTopBar(
+                    onClickBack = onClickBack,
+                    onClickInfo = {
+                        showInfoSheet = true
+                    },
+                    title = wallpaper.title ?: stringResource(id = R.string.wallpaper)
+                )
             }
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                val scope = rememberCoroutineScope()
+            val scope = rememberCoroutineScope()
 
-                AnimatedVisibility(
-                    visible = showUi
-                ) {
-                    BottomBar(
-                        modifier = Modifier
-                            .padding(bottom = 30.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        onClickEdit = {
-                            showEditView = true
-                        },
-                        onClickWallpaper = {
-                            showModeSelection = true
-                        },
-                        onClickDownload = {
-                            val prefix = wallpaper.title ?: wallpaper.category ?: wallpaper.author
-                            val timeStamp = Instant.now().epochSecond
-                            launcher.launch("$prefix-$timeStamp.png")
-                        },
-                        onClickFavourite = {
-                            liked = !liked
-                            scope.launch(Dispatchers.IO) {
-                                if (!liked) {
-                                    Database.favoritesDao().removeFromFavorites(wallpaper)
-                                } else {
-                                    Database.favoritesDao().insert(wallpaper, true, null)
-                                }
-                            }
-                        },
-                        isFavourite = liked
-                    )
-                }
-            }
+            WallpaperToolbar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 30.dp),
+                expanded = showUi,
+                onClickEdit = {
+                    showEditView = true
+                },
+                onClickWallpaper = {
+                    showModeSelection = true
+                },
+                onClickDownload = {
+                    val prefix = wallpaper.title ?: wallpaper.category ?: wallpaper.author
+                    val timeStamp = Instant.now().epochSecond
+                    saveImageLauncher.launch("$prefix-$timeStamp.png")
+                },
+                onClickFavourite = {
+                    liked = !liked
+                    scope.launch(Dispatchers.IO) {
+                        if (!liked) {
+                            Database.favoritesDao().removeFromFavorites(wallpaper)
+                        } else {
+                            Database.favoritesDao().insert(wallpaper, true, null)
+                        }
+                    }
+                },
+                isFavourite = liked
+            )
         }
 
-        if (showEditView) {
-            WallpaperFilterEditor(wallpaper = wallpaper) {
+        cachedBitmap?.takeIf { showEditView }?.let { cachedBitmap ->
+            WallpaperFilterEditor(wallpaper = wallpaper, cachedBitmap) {
                 showEditView = false
             }
         }
@@ -189,11 +191,13 @@ fun WallpaperView(
     if (showInfoSheet) {
         WallpaperInfoSheet(onDismissRequest = { showInfoSheet = false }, wallpaper = wallpaper)
     }
-    if (showModeSelection) {
-        WallpaperModeDialog(
+    cachedBitmap?.takeIf { showModeSelection }?.let { cachedBitmap ->
+        ApplyWallpaperDialog(
             wallpaper,
+            cachedBitmap,
             wallpaperHelperModel,
-            onDismissRequest = { showModeSelection = false })
+            onDismissRequest = { showModeSelection = false }
+        )
     }
 
     MultiStateDialog(
